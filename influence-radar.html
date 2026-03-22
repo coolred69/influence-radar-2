@@ -164,6 +164,10 @@ label{font-size:9px;color:var(--dim);display:block;margin-bottom:4px;letter-spac
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
     인물 연관맵
   </button>
+  <button class="nav-btn" onclick="switchTab('pattern',this)">
+    <svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    과거 패턴
+  </button>
 </nav>
 
 <!-- CONTENT -->
@@ -174,6 +178,7 @@ label{font-size:9px;color:var(--dim);display:block;margin-bottom:4px;letter-spac
   <div class="tab" id="tab-log"></div>
   <div class="tab" id="tab-sim"></div>
   <div class="tab" id="tab-map"></div>
+  <div class="tab" id="tab-pattern"></div>
 </div>
 
 <!-- DESKTOP TAB NAV (hidden) -->
@@ -264,6 +269,260 @@ const SM = {
     d:[{t:"LMT",n:"Lockheed Martin",f:80,mc:"130B",note:"F-35·미사일"},{t:"RTX",n:"RTX",f:77,mc:"150B",note:"레이더·미사일"},{t:"NOC",n:"Northrop",f:76,mc:"70B",note:"스텔스·우주"}],
     i:[{t:"PLTR",n:"Palantir",f:72,mc:"200B",note:"군사AI"},{t:"RKLB",n:"Rocket Lab",f:63,mc:"10B",note:"발사체"},{t:"HII",n:"Huntington Ingalls",f:70,mc:"10B",note:"해군함정"}]},
 };
+
+// ═══════════════════════════════════════
+// 인물별 과거 패턴 데이터베이스
+// ═══════════════════════════════════════
+const PATTERNS = {
+  1: { // Trump
+    name: "Donald Trump",
+    color: "#ff4444",
+    patternScore: 94, // 패턴 신뢰도 점수
+    signaturePatterns: [
+      {
+        id:"T1",
+        name:"관세 쇼크 → 유예 사이클",
+        type:"연출의심",
+        frequency:"반복확인 3회",
+        description:"강경 관세 발표로 시장 급락 유발 → 수일 내 유예·완화 발표 → 시장 급반등",
+        avgDropPct: 8,
+        avgRecoveryDays: 7,
+        avgPureEffect: 6.5,
+        suspicion: 92,
+        examples:[
+          {date:"2025-04-02", event:"상호관세 전면시행", drop:8, recovery:14},
+          {date:"2025-04-09", event:"90일 유예 발표 전 'BUY' 트윗", drop:-9, recovery:0},
+          {date:"2025-06-01", event:"EU 관세 50% → 유예", drop:5, recovery:5},
+        ],
+        signal:"관세 발표 → 급락 → 3~10일 내 완화 발표 패턴. 급락 시 매수 기회",
+        actionOnDetect:"발표 당일 분할매수 시작 · 유예 발표 시 청산",
+      },
+      {
+        id:"T2",
+        name:"소셜 선행 매수 암시",
+        type:"내부자거래의심",
+        frequency:"2회 확인",
+        description:"Truth Social에 매수 암시 포스팅 직후 정책 완화 발표. 내부 서클 사전 정보 의혹",
+        avgDropPct: 0,
+        avgRecoveryDays: 1,
+        avgPureEffect: 9,
+        suspicion: 95,
+        examples:[
+          {date:"2025-04-09", event:"'THIS IS A GREAT TIME TO BUY!!!' 트윗", drop:-9, recovery:0},
+        ],
+        signal:"Truth Social에 매수 암시 문구 등장 시 즉시 주목",
+        actionOnDetect:"즉시 포지션 진입 검토 · 당일 내 정책 발표 가능성 높음",
+      },
+      {
+        id:"T3",
+        name:"크립토 Pump & Dump",
+        type:"연출의심",
+        frequency:"반복확인",
+        description:"$TRUMP 밈코인 발행·홍보 후 내부 보유 물량 매도. 소매 투자자 피해",
+        avgDropPct: 25,
+        avgRecoveryDays: 0,
+        avgPureEffect: 24,
+        suspicion: 97,
+        examples:[
+          {date:"2025-01-17", event:"$TRUMP 밈코인 론칭", drop:0, recovery:0},
+          {date:"2025-03-01", event:"$TRUMP 고점 후 80% 폭락", drop:80, recovery:0},
+        ],
+        signal:"Trump 관련 새 토큰·코인 발행 시 진입 금지 — Pump&Dump 구조",
+        actionOnDetect:"절대 진입 금지 · 오히려 관련 거래소 주식 주의",
+      },
+    ],
+    overallPattern:"발언→급락→유예 사이클 반복. SEC 무력화로 조사 불가. 발언 후 2~10일 내 원복 패턴 강함",
+    patternBonus: +8, // 영향력 점수 보정치
+  },
+  2: { // Musk
+    name: "Elon Musk",
+    color: "#ff8c00",
+    patternScore: 89,
+    signaturePatterns: [
+      {
+        id:"M1",
+        name:"SNS 급등락 트리거",
+        type:"의도적조작의심",
+        frequency:"반복확인 5회+",
+        description:"X 트윗 한 줄로 크립토·주식 급등락 유발. DOGE 반복 언급으로 수혜",
+        avgDropPct: 12,
+        avgRecoveryDays: 14,
+        avgPureEffect: 11,
+        suspicion: 88,
+        examples:[
+          {date:"2021-05-13", event:"Tesla BTC결제 중단 선언", drop:15, recovery:28},
+          {date:"2021-02-01", event:"DOGE 반복 트윗 → +800%", drop:-50, recovery:0},
+          {date:"2025-06-05", event:"Trump 갈등 폭발 → DOGE -10%", drop:10, recovery:9},
+        ],
+        signal:"새벽 트윗 특히 주의 — 한국시간 오전 4~8시 집중",
+        actionOnDetect:"트윗 확인 즉시 15분 내 종목 반응 체크",
+      },
+      {
+        id:"M2",
+        name:"Trump 갈등→화해 사이클",
+        type:"연출의심",
+        frequency:"2회 확인",
+        description:"Trump와 공개 충돌 → 관련 종목 급락 → 3주 내 화해 → 완전 회복. 연출 가능성 높음",
+        avgDropPct: 10,
+        avgRecoveryDays: 21,
+        avgPureEffect: 8,
+        suspicion: 82,
+        examples:[
+          {date:"2025-06-05", event:"Big Beautiful Bill 갈등 폭발", drop:10, recovery:21},
+          {date:"2022-07-01", event:"Twitter 갈등 → 화해", drop:8, recovery:18},
+        ],
+        signal:"갈등 폭발 시 TSLA·DOGE 분할매수 시작 · 화해 시그널 시 청산",
+        actionOnDetect:"갈등 첫날 1/3 진입 · +1주 1/3 · 화해 시 전량 청산",
+      },
+      {
+        id:"M3",
+        name:"제품 발표 전후 급등",
+        type:"정상패턴",
+        frequency:"반복확인",
+        description:"Tesla 신제품·FSD·Optimus 발표 전후 TSLA 급등. AI 키노트 전 NVDA 동반 상승",
+        avgDropPct: -15,
+        avgRecoveryDays: 0,
+        avgPureEffect: -12,
+        suspicion: 15,
+        examples:[
+          {date:"2025-11-19", event:"Nvidia 지지 트윗 → NVDA +3%", drop:-3, recovery:0},
+        ],
+        signal:"GTC·Tesla AI Day 1주 전부터 관련주 모니터링",
+        actionOnDetect:"이벤트 5일 전 진입 검토 · 이벤트 당일 청산",
+      },
+    ],
+    overallPattern:"SNS 발언 충격파 강하나 회복도 빠름. Trump 관계 상태(동맹/갈등) 파악이 핵심",
+    patternBonus: +5,
+  },
+  3: { // Powell
+    name: "Jerome Powell",
+    color: "#4a9eff",
+    patternScore: 76,
+    signaturePatterns: [
+      {
+        id:"P1",
+        name:"FOMC 충격 → 2주 회복",
+        type:"정상패턴",
+        frequency:"반복확인",
+        description:"금리 동결·인상 발표 시 당일 급락 후 1~2주 내 회복. 예측 가능한 패턴",
+        avgDropPct: 3,
+        avgRecoveryDays: 10,
+        avgPureEffect: 2,
+        suspicion: 20,
+        examples:[
+          {date:"2025-09-01", event:"밸류에이션 고평가 경고", drop:2, recovery:7},
+          {date:"2025-11-01", event:"금리 동결 + 인플레 우려", drop:1, recovery:5},
+        ],
+        signal:"FOMC 발표 당일 급락 시 단기 매수 기회. 2주 회복 패턴",
+        actionOnDetect:"FOMC 당일 종가 매수 · 2주 후 청산",
+      },
+    ],
+    overallPattern:"일정이 고정돼 있어 예측 가능. 발언 자체보다 시장 예상 대비 서프라이즈 여부가 관건",
+    patternBonus: 0,
+  },
+  4: { // Xi
+    name: "Xi Jinping",
+    color: "#ef4444",
+    patternScore: 71,
+    signaturePatterns: [
+      {
+        id:"X1",
+        name:"반도체 규제 카드",
+        type:"지정학패턴",
+        frequency:"반복확인",
+        description:"미중 갈등 고조 시 반도체 수출제한 경고 → NVDA·TSM 급락. 그러나 실제 완전 차단은 미실행",
+        avgDropPct: 6,
+        avgRecoveryDays: 12,
+        avgPureEffect: 5,
+        suspicion: 65,
+        examples:[
+          {date:"2026-02-10", event:"반도체 수출제한 확대 경고", drop:5, recovery:12},
+          {date:"2024-10-01", event:"갈륨·게르마늄 수출제한", drop:4, recovery:10},
+        ],
+        signal:"경고 발언 직후 NVDA·TSM·ASML 급락. 실제 입법까지 시간차 있음",
+        actionOnDetect:"경고 발언 시 반도체 ETF SOXX 분할매수 검토",
+      },
+      {
+        id:"X2",
+        name:"대만 긴장 고조",
+        type:"지정학패턴",
+        frequency:"계절성",
+        description:"연 1~2회 대만 관련 강경 발언 → 방위주 급등 / 테크주 급락",
+        avgDropPct: 4,
+        avgRecoveryDays: 20,
+        avgPureEffect: 3.5,
+        suspicion: 55,
+        examples:[
+          {date:"2024-05-01", event:"대만 훈련 발표", drop:3, recovery:15},
+        ],
+        signal:"방위주(LMT·RTX·NOC) 급등 · 테크주 급락 동시 발생",
+        actionOnDetect:"방위주 롱 / 중국 테크주 관망",
+      },
+    ],
+    overallPattern:"불규칙하나 반도체·대만 관련 발언 패턴 명확. 사전 감지 어려움 — 신화사 실시간 모니터 필수",
+    patternBonus: +2,
+  },
+  5: { // Jensen Huang
+    name: "Jensen Huang",
+    color: "#76b900",
+    patternScore: 82,
+    signaturePatterns: [
+      {
+        id:"J1",
+        name:"실적 발표 서프라이즈",
+        type:"정상패턴",
+        frequency:"분기마다",
+        description:"분기 실적 발표 시 가이던스 상향 반복 → 시간외 +5~10%. 다음날 갭업",
+        avgDropPct: -7,
+        avgRecoveryDays: 0,
+        avgPureEffect: -6,
+        suspicion: 10,
+        examples:[
+          {date:"2025-11-19", event:"Q3 실적 + 가이던스 상향", drop:-6, recovery:0},
+          {date:"2025-08-01", event:"Q2 실적 서프라이즈", drop:-8, recovery:0},
+        ],
+        signal:"실적 발표 전날 진입 · 당일 갭업 시 청산",
+        actionOnDetect:"실적일 2일 전 진입 · 발표 후 갭업 시 일부 청산",
+      },
+      {
+        id:"J2",
+        name:"GTC 키노트 랠리",
+        type:"정상패턴",
+        frequency:"연1회 (3월)",
+        description:"GTC 컨퍼런스 키노트 발표 전후 NVDA 10~20% 랠리. AI 관련주 동반 상승",
+        avgDropPct: -12,
+        avgRecoveryDays: 0,
+        avgPureEffect: -10,
+        suspicion: 8,
+        examples:[
+          {date:"2025-03-01", event:"GTC 2025 키노트 — 블랙웰 발표", drop:-15, recovery:0},
+        ],
+        signal:"GTC 1주 전부터 NVDA·SMCI·ANET 동반 상승 패턴",
+        actionOnDetect:"GTC 2주 전 진입 · 키노트 당일 일부 청산",
+      },
+    ],
+    overallPattern:"조작 의심 없음. 실적·이벤트 기반 예측 가능한 상승 패턴. 캘린더 등록만으로 선제 대응 가능",
+    patternBonus: +3,
+  },
+};
+
+// 패턴 기반 영향력 점수 보정
+function applyPatternBonus(fig) {
+  const p = PATTERNS[fig.id];
+  if(!p) return fig.inf;
+  return Math.min(100, fig.inf + (p.patternBonus||0));
+}
+
+// 패턴 신호강도 계산 (최근 로그와 패턴 매칭)
+function calcPatternStrength(figId) {
+  const p = PATTERNS[figId];
+  if(!p) return 0;
+  const recentLogs = state.logs.filter(l=>l.figId===figId).slice(0,5);
+  const matchCount = recentLogs.filter(l=>
+    p.signaturePatterns.some(sp=>Math.abs(l.drop - sp.avgDropPct) < 5)
+  ).length;
+  return Math.min(100, p.patternScore + matchCount*3);
+}
 
 const INIT_LOGS = [
   {id:1,figId:1,date:"2025-04-02",type:"부정",stmt:"상호관세 전면 시행 발표",
@@ -411,7 +670,6 @@ function buyCalcCard(ticker, dropPct) {
       </div>
     </div>`;
 }
-const oppBorder = s => s>=70?'#ff4444':s>=45?'#ff8c00':s>=25?'#fbbf24':'#2a2a4a';
 
 // 발언 순수 효과 계산 (발언 충격 - 시장 등락 - 섹터 등락 평균)
 function pureEffect(log){
@@ -575,6 +833,7 @@ function render(name){
     case 'log': renderLog(); break;
     case 'sim': renderSim(); break;
     case 'map': renderMap(); break;
+    case 'pattern': renderPattern(); break;
   }
 }
 
@@ -1294,6 +1553,193 @@ function updateClock(){
   const now = new Date();
   document.getElementById('clock').textContent =
     now.toLocaleString('ko-KR',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+// ═══════════════════════════════════════
+// RENDER: PATTERN
+// ═══════════════════════════════════════
+function renderPattern(){
+  const figs = getSortedFigs();
+  const selPat = PATTERNS[state.selFigId] || PATTERNS[1];
+  const selFig = figs.find(f=>f.id===state.selFigId) || figs[0];
+
+  document.getElementById('tab-pattern').innerHTML = `
+    <div class="sec">과거 패턴 분석 — 영향력 점수 보정 기반</div>
+
+    <!-- 인물 선택 -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      ${Object.entries(PATTERNS).map(([id,p])=>{
+        const fig=figs.find(f=>f.id===+id);
+        if(!fig) return '';
+        const active = +id===state.selFigId;
+        return `
+        <button onclick="state.selFigId=${id};renderPattern()" style="
+          display:flex;align-items:center;gap:7px;padding:7px 12px;
+          border:1px solid ${active?p.color:'#12123a'};
+          background:${active?p.color+'15':'transparent'};
+          border-radius:3px;cursor:pointer;font-family:var(--mono)">
+          <div style="width:22px;height:22px;border-radius:50%;
+            background:${p.color}22;border:1px solid ${p.color}55;
+            display:flex;align-items:center;justify-content:center;
+            font-size:8px;color:${p.color};font-weight:bold">${fig.avatar}</div>
+          <span style="font-size:10px;color:${active?p.color:'#889'}">${fig.name.split(' ')[1]||fig.name.split(' ')[0]}</span>
+        </button>`;
+      }).join('')}
+    </div>
+
+    ${selPat ? `
+    <!-- 인물 패턴 헤더 -->
+    <div style="padding:14px 16px;background:${selPat.color}0d;
+      border:1px solid ${selPat.color}33;border-left:3px solid ${selPat.color};
+      border-radius:4px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <span style="font-size:16px;font-weight:bold;color:${selPat.color};font-family:sans-serif">${selPat.name}</span>
+        <div style="display:flex;gap:8px;margin-left:auto">
+          <div style="text-align:center">
+            <div style="font-size:8px;color:#446;margin-bottom:2px">패턴신뢰도</div>
+            <div style="font-size:18px;font-weight:bold;color:${selPat.color};font-family:var(--mono)">${selPat.patternScore}</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:8px;color:#446;margin-bottom:2px">점수보정</div>
+            <div style="font-size:18px;font-weight:bold;color:${selPat.patternBonus>0?'#4ade80':selPat.patternBonus<0?'#f87171':'#446'};font-family:var(--mono)">
+              ${selPat.patternBonus>0?'+':''}${selPat.patternBonus}
+            </div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:8px;color:#446;margin-bottom:2px">보정후점수</div>
+            <div style="font-size:18px;font-weight:bold;color:${selPat.color};font-family:var(--mono)">
+              ${Math.min(100,(selFig.inf||0)+(selPat.patternBonus||0))}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#889;font-family:sans-serif;line-height:1.6">${selPat.overallPattern}</div>
+    </div>
+
+    <!-- 패턴 목록 -->
+    <div class="sec">시그니처 패턴 (${selPat.signaturePatterns.length}개)</div>
+    ${selPat.signaturePatterns.map(sp=>{
+      const typeColor = sp.type==='연출의심'?'#ff4444':
+                        sp.type==='내부자거래의심'?'#ff4444':
+                        sp.type==='의도적조작의심'?'#ff8c00':
+                        sp.type==='지정학패턴'?'#fbbf24':'#4ade80';
+      const isOpp = sp.avgDropPct > 0;
+      return `
+      <div class="card" style="margin-bottom:12px;border-top:2px solid ${typeColor}">
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+              <span style="font-size:13px;color:#eeeeff;font-family:sans-serif;font-weight:bold">${sp.name}</span>
+              <span style="font-size:8px;padding:2px 7px;border-radius:2px;
+                border:1px solid ${typeColor}44;background:${typeColor}15;color:${typeColor}">${sp.type}</span>
+              <span style="font-size:8px;color:#446">${sp.frequency}</span>
+            </div>
+            <div style="font-size:10px;color:#889;font-family:sans-serif;line-height:1.6">${sp.description}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:80px;text-align:center">
+            <div style="background:#0a0a1e;border:1px solid #1a1a3a;border-radius:3px;padding:5px 8px">
+              <div style="font-size:8px;color:#446">평균 충격</div>
+              <div style="font-size:15px;font-weight:bold;color:${isOpp?'#f87171':'#4ade80'};font-family:var(--mono)">
+                ${sp.avgDropPct>0?'-':''}${Math.abs(sp.avgDropPct)}%
+              </div>
+            </div>
+            <div style="background:#0a0a1e;border:1px solid #1a1a3a;border-radius:3px;padding:5px 8px">
+              <div style="font-size:8px;color:#446">순수효과</div>
+              <div style="font-size:15px;font-weight:bold;color:#fbbf24;font-family:var(--mono)">
+                ${sp.avgPureEffect>0?'-':''}${Math.abs(sp.avgPureEffect)}%
+              </div>
+            </div>
+            ${sp.avgRecoveryDays>0?`
+            <div style="background:#0a0a1e;border:1px solid #1a1a3a;border-radius:3px;padding:5px 8px">
+              <div style="font-size:8px;color:#446">평균회복</div>
+              <div style="font-size:15px;font-weight:bold;color:#60a5fa;font-family:var(--mono)">${sp.avgRecoveryDays}일</div>
+            </div>`:''}
+          </div>
+        </div>
+
+        <!-- 실제 사례 -->
+        <div style="margin-bottom:10px">
+          <div style="font-size:9px;color:#446;margin-bottom:6px;letter-spacing:1px">▶ 실제 사례</div>
+          ${sp.examples.map(ex=>`
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;
+              background:#08081c;border-radius:3px;margin-bottom:4px">
+              <span style="font-size:9px;color:#446;font-family:var(--mono);min-width:80px">${ex.date}</span>
+              <span style="flex:1;font-size:10px;color:#aab;font-family:sans-serif">${ex.event}</span>
+              <span style="font-size:11px;font-weight:bold;color:${ex.drop>0?'#f87171':'#4ade80'};font-family:var(--mono)">
+                ${ex.drop>0?'-':''}${Math.abs(ex.drop)}%
+              </span>
+              ${ex.recovery>0?`<span style="font-size:9px;color:#60a5fa;font-family:var(--mono)">${ex.recovery}일 회복</span>`:''}
+            </div>`).join('')}
+        </div>
+
+        <!-- 시그널 및 액션 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="padding:8px 10px;background:#0a1a10;border:1px solid #4ade8033;border-radius:3px">
+            <div style="font-size:8px;color:#4ade80;margin-bottom:4px;letter-spacing:1px">📡 감지 시그널</div>
+            <div style="font-size:10px;color:#aab;font-family:sans-serif;line-height:1.5">${sp.signal}</div>
+          </div>
+          <div style="padding:8px 10px;background:#1a0a00;border:1px solid #ff8c0033;border-radius:3px">
+            <div style="font-size:8px;color:#ff8c00;margin-bottom:4px;letter-spacing:1px">⚡ 감지 시 액션</div>
+            <div style="font-size:10px;color:#aab;font-family:sans-serif;line-height:1.5">${sp.actionOnDetect}</div>
+          </div>
+        </div>
+
+        <!-- 의심도 바 -->
+        <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:9px;color:#446;min-width:60px">조작의심도</span>
+          <div style="flex:1;height:4px;background:#0d0d28;border-radius:2px">
+            <div style="height:100%;width:${sp.suspicion}%;
+              background:${sp.suspicion>=80?'#ff4444':sp.suspicion>=50?'#ff8c00':'#4ade80'};
+              border-radius:2px"></div>
+          </div>
+          <span style="font-size:10px;color:${sp.suspicion>=80?'#ff4444':sp.suspicion>=50?'#ff8c00':'#4ade80'};
+            font-family:var(--mono);min-width:30px">${sp.suspicion}%</span>
+        </div>
+      </div>`;
+    }).join('')}
+
+    <!-- 전체 패턴 요약표 -->
+    <div style="margin-top:20px">
+      <div class="sec">전체 인물 패턴 요약</div>
+      ${Object.entries(PATTERNS).map(([id,p])=>{
+        const fig=figs.find(f=>f.id===+id);
+        if(!fig) return '';
+        const topPat = p.signaturePatterns.sort((a,b)=>b.suspicion-a.suspicion)[0];
+        return `
+        <div class="card card-border-l" style="border-left-color:${p.color};margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:28px;height:28px;border-radius:50%;
+              background:${p.color}1a;border:1px solid ${p.color}44;
+              display:flex;align-items:center;justify-content:center;
+              font-size:9px;color:${p.color};font-weight:bold;flex-shrink:0">${fig.avatar}</div>
+            <div style="flex:1">
+              <div style="font-size:11px;color:#eeeeff;font-family:sans-serif">${p.name}</div>
+              <div style="font-size:9px;color:#889;font-family:sans-serif;margin-top:2px">${topPat?.name||'—'}</div>
+            </div>
+            <div style="display:flex;gap:10px">
+              <div style="text-align:center">
+                <div style="font-size:8px;color:#446">신뢰도</div>
+                <div style="font-size:13px;color:${p.color};font-family:var(--mono);font-weight:bold">${p.patternScore}</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-size:8px;color:#446">보정</div>
+                <div style="font-size:13px;color:${p.patternBonus>0?'#4ade80':'#f87171'};font-family:var(--mono);font-weight:bold">
+                  ${p.patternBonus>0?'+':''}${p.patternBonus}
+                </div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-size:8px;color:#446">최고의심</div>
+                <div style="font-size:13px;color:${topPat?.suspicion>=80?'#ff4444':'#ff8c00'};font-family:var(--mono);font-weight:bold">
+                  ${topPat?.suspicion||0}%
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    ` : `<div style="text-align:center;padding:40px;color:#446">이 인물의 패턴 데이터가 없습니다</div>`}
+  `;
 }
 
 function buildDesktopNav(){
