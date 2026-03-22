@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Influence Radar">
+<meta name="theme-color" content="#04040f">
+<title>Influence Radar</title>
+<style>
+:root{
+  --bg:#04040f;--panel:#07071a;--border:#12123a;--text:#d0d0ee;--dim:#556;
+  --bright:#eeeeff;--red:#ff4444;--orange:#ff8c00;--yellow:#fbbf24;
+  --green:#4ade80;--blue:#4a9eff;--mono:'Courier New',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);
+  min-height:100vh;overflow-x:hidden}
+/* ── HEADER */
+#header{position:fixed;top:0;left:0;right:0;z-index:200;
+  background:var(--panel);border-bottom:1px solid var(--border);
+  padding:10px 16px;display:flex;align-items:center;justify-content:space-between;
+  height:50px}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--red);
+  box-shadow:0 0 8px var(--red);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.header-title{font-size:11px;letter-spacing:3px;color:var(--dim);text-transform:uppercase}
+.header-time{font-size:10px;color:var(--blue)}
+/* ── TAB NAV (상단 스크롤형) */
+#nav{position:sticky;top:50px;z-index:190;
+  background:#060616;border-bottom:1px solid var(--border);
+  display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;gap:0}
+#nav::-webkit-scrollbar{display:none}
+.nav-btn{flex-shrink:0;display:flex;flex-direction:row;align-items:center;
+  justify-content:center;gap:7px;cursor:pointer;border:none;
+  background:transparent;color:var(--dim);font-size:11px;
+  letter-spacing:1px;transition:all .15s;padding:0 18px;height:44px;
+  font-family:var(--mono);border-bottom:2px solid transparent;white-space:nowrap}
+.nav-btn.active{color:var(--blue);border-bottom-color:var(--blue);background:#0a1a3a44}
+.nav-btn svg{width:15px;height:15px;stroke-width:1.5;fill:none;stroke:currentColor;flex-shrink:0}
+/* ── CONTENT */
+#content{min-height:100vh;padding-bottom:20px}
+.tab{display:none;padding:16px}
+.tab.active{display:block}
+/* ── CARDS */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:4px;
+  padding:12px;margin-bottom:10px}
+.card-border-l{border-left-width:3px;border-left-style:solid}
+/* ── SECTION TITLE */
+.sec{font-size:9px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;
+  margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+/* ── BARS */
+.bar-wrap{width:100%;height:3px;background:#0d0d28;border-radius:2px;overflow:hidden}
+.bar-fill{height:100%;border-radius:2px;transition:width .8s ease}
+/* ── TAGS */
+.tag{display:inline-block;font-size:9px;padding:2px 7px;border-radius:2px;
+  border:1px solid;white-space:nowrap}
+/* ── FIGURE ROW */
+.fig-row{display:flex;align-items:center;gap:10px;padding:12px;
+  border-bottom:1px solid #0d0d28;cursor:pointer;
+  border-left:3px solid transparent;transition:background .1s}
+.fig-row:hover{background:#08081c}
+.fig-row.selected{border-left-color:var(--sel-color,var(--blue))}
+.avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:10px;font-weight:bold;flex-shrink:0}
+/* ── GRID */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+/* ── FORM */
+input,select,textarea{background:#0d0d28;border:1px solid var(--border);
+  color:var(--text);padding:7px 10px;font-size:11px;border-radius:3px;
+  font-family:var(--mono);width:100%}
+input[type=range]{background:none;border:none;padding:4px 0}
+label{font-size:9px;color:var(--dim);display:block;margin-bottom:4px;letter-spacing:1px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:8px 16px;border-radius:3px;font-size:10px;cursor:pointer;
+  font-family:var(--mono);letter-spacing:1px;border:1px solid;transition:background .1s}
+.btn-blue{border-color:var(--blue);background:#0a1a3a;color:var(--blue)}
+.btn-green{border-color:var(--green);background:#0a2a1a;color:var(--green)}
+.btn-red{border-color:var(--red);background:#1a0808;color:var(--red)}
+/* ── ALERT BADGE */
+.alert-badge{position:absolute;top:-4px;right:-4px;background:var(--red);
+  color:#fff;font-size:8px;width:16px;height:16px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center}
+/* ── NOTIF PANEL */
+#notif-panel{position:fixed;top:50px;left:0;right:0;z-index:150;
+  max-height:200px;overflow-y:auto;display:none}
+.notif-item{padding:10px 16px;background:#120a00;border-bottom:1px solid #ff8c0033;
+  display:flex;gap:10px;align-items:flex-start;font-size:11px}
+/* ── SCORE BIG */
+.score-big{font-size:28px;font-weight:bold;font-family:var(--mono);line-height:1}
+/* ── PURE EFFECT */
+.pure-effect{padding:8px 10px;border-radius:3px;background:#08081c;margin-top:6px}
+/* ── MOBILE DETAIL SHEET */
+#detail-sheet{position:fixed;bottom:58px;left:0;right:0;background:var(--panel);
+  border-top:1px solid var(--border);z-index:100;
+  max-height:70vh;overflow-y:auto;transform:translateY(100%);
+  transition:transform .3s ease;border-radius:12px 12px 0 0}
+#detail-sheet.open{transform:translateY(0)}
+.sheet-handle{width:40px;height:4px;background:var(--border);border-radius:2px;
+  margin:10px auto 0}
+/* ── TEMP COLORS */
+.temp-hot{color:#ef4444}.temp-warm{color:#f97316}.temp-cool{color:#fbbf24}.temp-cold{color:var(--blue)}
+/* ── OPP COLORS */
+.opp-red{color:#ff4444}.opp-orange{color:#ff8c00}.opp-yellow{color:#fbbf24}.opp-grey{color:#446}
+/* ── RESPONSIVE DESKTOP */
+@media(min-width:768px){
+  .grid2{grid-template-columns:repeat(3,1fr)}
+  .nav-btn{font-size:12px;padding:0 22px;height:46px}
+}
+#tab-nav-desktop{display:none}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="live-dot" id="live-dot"></div>
+    <span class="header-title">Influence Radar</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="position:relative;cursor:pointer" onclick="toggleNotif()">
+      <svg width="20" height="20" fill="none" stroke="#aab" stroke-width="1.5" viewBox="0 0 24 24">
+        <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+      </svg>
+      <div class="alert-badge" id="notif-count" style="display:none">0</div>
+    </div>
+    <span class="header-time" id="clock"></span>
+  </div>
+</div>
+
+<!-- DESKTOP TAB NAV -->
+<div id="tab-nav-desktop"></div>
+
+<!-- NOTIFICATION PANEL -->
+<div id="notif-panel"></div>
+
+<!-- TAB NAV (상단 스크롤) -->
+<nav id="nav">
+  <button class="nav-btn active" onclick="switchTab('radar',this)">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.93 4.93l2.12 2.12m9.9 9.9l2.12 2.12M4.93 19.07l2.12-2.12m9.9-9.9l2.12-2.12"/></svg>
+    영향력 레이더
+  </button>
+  <button class="nav-btn" onclick="switchTab('stocks',this)">
+    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    종목 분석
+  </button>
+  <button class="nav-btn" onclick="switchTab('filter',this)">
+    <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+    기회 필터
+  </button>
+  <button class="nav-btn" onclick="switchTab('log',this)">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    발언 로그
+  </button>
+  <button class="nav-btn" onclick="switchTab('sim',this)">
+    <svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    알림 시뮬레이터
+  </button>
+  <button class="nav-btn" onclick="switchTab('map',this)">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
+    인물 연관맵
+  </button>
+</nav>
+
+<!-- CONTENT -->
+<div id="content">
+  <div class="tab active" id="tab-radar"></div>
+  <div class="tab" id="tab-stocks"></div>
+  <div class="tab" id="tab-filter"></div>
+  <div class="tab" id="tab-log"></div>
+  <div class="tab" id="tab-sim"></div>
+  <div class="tab" id="tab-map"></div>
+</div>
+
+<!-- DESKTOP TAB NAV (hidden) -->
+<div id="tab-nav-desktop"></div>
+
+<!-- MOBILE DETAIL SHEET -->
+<div id="detail-sheet">
+  <div class="sheet-handle"></div>
+  <div id="detail-content" style="padding:16px"></div>
+  <div style="padding:12px 16px">
+    <button class="btn btn-blue" style="width:100%" onclick="closeSheet()">닫기</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════
+const FIGS = [
+  {id:1,name:"Donald Trump",avatar:"DT",country:"🇺🇸",title:"미국 대통령",color:"#ff4444",
+   inf:100,base:100,susp:95,chType:"소셜직접형",
+   ch:["Truth Social @realDonaldTrump","백악관 기자회견","행정명령"],
+   sec:["TRADE","ENERGY","CRYPTO","DEFENSE","FINANCE"],
+   rel:[{to:2,type:"동맹",str:85},{to:4,type:"갈등",str:90}]},
+  {id:2,name:"Elon Musk",avatar:"EM",country:"🇺🇸",title:"Tesla·xAI CEO",color:"#ff8c00",
+   inf:97,base:97,susp:88,chType:"소셜직접형",
+   ch:["X @elonmusk","Tesla 실적발표","제품 키노트"],
+   sec:["AI","EV","CRYPTO","SPACE","ROBOT"],
+   rel:[{to:1,type:"동맹",str:85},{to:5,type:"협력",str:72}]},
+  {id:3,name:"Jerome Powell",avatar:"JP",country:"🇺🇸",title:"연준 의장",color:"#4a9eff",
+   inf:91,base:91,susp:28,chType:"기관성명형",
+   ch:["FOMC 성명 (일정고정)","의회 증언","잭슨홀 연설"],
+   sec:["FINANCE","BOND","GOLD"],rel:[]},
+  {id:4,name:"Xi Jinping",avatar:"XJ",country:"🇨🇳",title:"중국 국가주석",color:"#ef4444",
+   inf:89,base:89,susp:67,chType:"정책발표형",
+   ch:["신화사 영문판","당 대회 발표","인민일보"],
+   sec:["SEMICON","CHINA_TECH","RARE_EARTH"],
+   rel:[{to:1,type:"갈등",str:90}]},
+  {id:5,name:"Jensen Huang",avatar:"JH",country:"🇺🇸",title:"NVIDIA CEO",color:"#76b900",
+   inf:84,base:84,susp:18,chType:"이벤트발표형",
+   ch:["GTC 컨퍼런스 (연1회)","분기 실적발표","X @jensenhuang"],
+   sec:["AI","SEMICON","CLOUD","ROBOT"],
+   rel:[{to:2,type:"협력",str:72}]},
+  {id:6,name:"Warren Buffett",avatar:"WB",country:"🇺🇸",title:"Berkshire 회장",color:"#c084fc",
+   inf:82,base:82,susp:22,chType:"인터뷰형",
+   ch:["연간 주주서한 (2월)","13F 공시","CNBC 인터뷰"],
+   sec:["FINANCE","CONSUMER","ENERGY"],rel:[]},
+  {id:7,name:"Jamie Dimon",avatar:"JD",country:"🇺🇸",title:"JPMorgan CEO",color:"#06b6d4",
+   inf:78,base:78,susp:31,chType:"인터뷰형",
+   ch:["연간 주주서한","다보스 발언","Bloomberg 인터뷰"],
+   sec:["FINANCE","BOND","CRYPTO"],rel:[]},
+  {id:8,name:"Sam Altman",avatar:"SA",country:"🇺🇸",title:"OpenAI CEO",color:"#10b981",
+   inf:74,base:74,susp:29,chType:"소셜직접형",
+   ch:["X @sama","제품발표","의회 증언"],
+   sec:["AI","CLOUD","SEMICON"],rel:[]},
+  {id:9,name:"MBS",avatar:"MB",country:"🇸🇦",title:"사우디 왕세자",color:"#f97316",
+   inf:72,base:72,susp:55,chType:"정책발표형",
+   ch:["OPEC+ 발표","사우디 국영미디어 SPA"],
+   sec:["ENERGY","DEFENSE"],rel:[]},
+];
+
+const SM = {
+  AI:{label:"AI·딥러닝",color:"#76b900",temp:88,
+    d:[{t:"NVDA",n:"NVIDIA",f:92,mc:"3.1T",note:"AI칩 독점"},{t:"MSFT",n:"Microsoft",f:88,mc:"3.0T",note:"OpenAI+Azure"},{t:"GOOGL",n:"Alphabet",f:85,mc:"2.0T",note:"Gemini·TPU"}],
+    i:[{t:"SMCI",n:"Super Micro",f:72,mc:"30B",note:"AI서버"},{t:"ANET",n:"Arista",f:80,mc:"120B",note:"DC네트워크"},{t:"ARM",n:"ARM Holdings",f:76,mc:"140B",note:"칩설계"}]},
+  SEMICON:{label:"반도체",color:"#a78bfa",temp:72,
+    d:[{t:"NVDA",n:"NVIDIA",f:92,mc:"3.1T",note:"GPU 독점"},{t:"AMD",n:"AMD",f:78,mc:"220B",note:"NVDA대안"},{t:"INTC",n:"Intel",f:52,mc:"90B",note:"구조조정中"}],
+    i:[{t:"ASML",n:"ASML",f:90,mc:"280B",note:"EUV독점"},{t:"AMAT",n:"Applied Materials",f:82,mc:"140B",note:"반도체장비"},{t:"TSM",n:"TSMC ADR",f:91,mc:"900B",note:"파운드리1위"}]},
+  EV:{label:"전기차·로봇",color:"#ff8c00",temp:45,
+    d:[{t:"TSLA",n:"Tesla",f:61,mc:"800B",note:"브랜드리스크"},{t:"RIVN",n:"Rivian",f:44,mc:"15B",note:"적자지속"},{t:"LI",n:"Li Auto",f:71,mc:"25B",note:"중국내수"}],
+    i:[{t:"ALB",n:"Albemarle",f:65,mc:"10B",note:"리튬원자재"},{t:"ON",n:"ON Semi",f:74,mc:"30B",note:"EV전력반도체"},{t:"APTV",n:"Aptiv",f:68,mc:"12B",note:"자율주행부품"}]},
+  CRYPTO:{label:"크립토",color:"#f59e0b",temp:61,
+    d:[{t:"COIN",n:"Coinbase",f:65,mc:"55B",note:"미국최대거래소"},{t:"MSTR",n:"MicroStrategy",f:58,mc:"80B",note:"BTC레버리지"},{t:"IBIT",n:"iShares BTC ETF",f:70,mc:"—",note:"BTC직접노출"}],
+    i:[{t:"RIOT",n:"Riot Platforms",f:51,mc:"4B",note:"BTC채굴"},{t:"SQ",n:"Block",f:67,mc:"40B",note:"크립토결제"},{t:"CLSK",n:"CleanSpark",f:53,mc:"3B",note:"BTC채굴"}]},
+  ENERGY:{label:"에너지",color:"#ef4444",temp:79,
+    d:[{t:"XOM",n:"ExxonMobil",f:74,mc:"490B",note:"원유메이저"},{t:"CVX",n:"Chevron",f:72,mc:"270B",note:"원유메이저"},{t:"OXY",n:"Occidental",f:68,mc:"48B",note:"Buffett보유"}],
+    i:[{t:"HAL",n:"Halliburton",f:66,mc:"28B",note:"유전서비스"},{t:"SLB",n:"SLB",f:70,mc:"60B",note:"오일필드1위"},{t:"FSLR",n:"First Solar",f:72,mc:"20B",note:"태양광"}]},
+  FINANCE:{label:"금융·은행",color:"#06b6d4",temp:55,
+    d:[{t:"JPM",n:"JPMorgan",f:85,mc:"700B",note:"미국최대은행"},{t:"BAC",n:"BofA",f:78,mc:"340B",note:"금리민감"},{t:"GS",n:"Goldman Sachs",f:82,mc:"180B",note:"M&A·트레이딩"}],
+    i:[{t:"V",n:"Visa",f:88,mc:"600B",note:"결제인프라"},{t:"BRK.B",n:"Berkshire",f:86,mc:"1.0T",note:"Buffett펀드"},{t:"SCHW",n:"Schwab",f:74,mc:"130B",note:"리테일브로커"}]},
+  CHINA_TECH:{label:"중국 테크",color:"#fbbf24",temp:38,
+    d:[{t:"BABA",n:"Alibaba",f:67,mc:"250B",note:"이커머스·클라우드"},{t:"BIDU",n:"Baidu",f:59,mc:"30B",note:"검색·AI"},{t:"PDD",n:"PDD Holdings",f:71,mc:"130B",note:"테무모회사"}],
+    i:[{t:"FXI",n:"China ETF",f:58,mc:"—",note:"중국대형주"},{t:"KWEB",n:"China Internet ETF",f:60,mc:"—",note:"인터넷ETF"},{t:"JD",n:"JD.com",f:62,mc:"45B",note:"이커머스"}]},
+  ROBOT:{label:"로봇·자동화",color:"#10b981",temp:66,
+    d:[{t:"TSLA",n:"Tesla(Optimus)",f:61,mc:"800B",note:"Optimus2027"},{t:"ISRG",n:"Intuitive Surgical",f:85,mc:"180B",note:"수술로봇"},{t:"ABB",n:"ABB Ltd",f:79,mc:"80B",note:"산업로봇"}],
+    i:[{t:"NVDA",n:"NVIDIA",f:92,mc:"3.1T",note:"로봇AI두뇌"},{t:"TER",n:"Teradyne",f:74,mc:"15B",note:"로봇테스팅"},{t:"RKLB",n:"Rocket Lab",f:63,mc:"10B",note:"소형발사체"}]},
+  DEFENSE:{label:"방위·우주",color:"#8b5cf6",temp:82,
+    d:[{t:"LMT",n:"Lockheed Martin",f:80,mc:"130B",note:"F-35·미사일"},{t:"RTX",n:"RTX",f:77,mc:"150B",note:"레이더·미사일"},{t:"NOC",n:"Northrop",f:76,mc:"70B",note:"스텔스·우주"}],
+    i:[{t:"PLTR",n:"Palantir",f:72,mc:"200B",note:"군사AI"},{t:"RKLB",n:"Rocket Lab",f:63,mc:"10B",note:"발사체"},{t:"HII",n:"Huntington Ingalls",f:70,mc:"10B",note:"해군함정"}]},
+};
+
+const INIT_LOGS = [
+  {id:1,figId:1,date:"2025-04-02",type:"부정",stmt:"상호관세 전면 시행 발표",
+   tickers:"SPY,XOM",drop:8,spDrop:7,sectorDrop:6,recovery:14,verified:true,
+   note:"관세 전면시행 — 시장 전반 하락"},
+  {id:2,figId:1,date:"2025-04-09",type:"긍정",stmt:"THIS IS A GREAT TIME TO BUY! → 90일 유예",
+   tickers:"SPY,NVDA",drop:-9,spDrop:-8,sectorDrop:-7,recovery:0,verified:true,
+   note:"유예발표 당일 역대급 급등"},
+  {id:3,figId:2,date:"2021-05-13",type:"부정",stmt:"Tesla BTC결제 중단 발표",
+   tickers:"TSLA,COIN",drop:15,spDrop:1,sectorDrop:2,recovery:28,verified:true,
+   note:"발언 순수효과 높음 — 시장무관 개별 급락"},
+  {id:4,figId:2,date:"2025-06-05",type:"부정",stmt:"Trump-Musk 갈등 폭발 (연출 의심)",
+   tickers:"DOGE,TSLA",drop:10,spDrop:1,sectorDrop:3,recovery:9,verified:false,
+   note:"갈등 연출 가능성 — 빠른 화해로 회복"},
+  {id:5,figId:5,date:"2025-11-19",type:"긍정",stmt:"Q3 실적+가이던스 상향 발표",
+   tickers:"NVDA,AMD",drop:-6,spDrop:-1,sectorDrop:-2,recovery:0,verified:true,
+   note:"실적 서프라이즈 — 시간외 +5.7%"},
+  {id:6,figId:4,date:"2026-02-10",type:"부정",stmt:"반도체 수출제한 확대 경고",
+   tickers:"NVDA,TSM",drop:5,spDrop:1,sectorDrop:4,recovery:12,verified:true,
+   note:"중국발 규제 — 반도체 섹터 집중 타격"},
+];
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let state = {
+  figs: JSON.parse(localStorage.getItem('ir_figs') || JSON.stringify(FIGS)),
+  logs: JSON.parse(localStorage.getItem('ir_logs') || JSON.stringify(INIT_LOGS)),
+  alerts: JSON.parse(localStorage.getItem('ir_alerts') || '[]'),
+  selFigId: 1,
+  selSector: 'AI',
+  fundMin: 60,
+  simDrop: 15,
+  simFigId: 1,
+  simSector: 'AI',
+  notifOpen: false,
+  currentTab: 'radar',
+  budget: 10000,  // 매입 예산 ($)
+};
+
+function save(){
+  localStorage.setItem('ir_figs', JSON.stringify(state.figs));
+  localStorage.setItem('ir_logs', JSON.stringify(state.logs));
+  localStorage.setItem('ir_alerts', JSON.stringify(state.alerts));
+}
+
+// ═══════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════
+const opp = (inf,f,d) => Math.round((inf/100)*(f/100)*Math.abs(d)*10);
+const oppLabel = s => s>=70?'🔴 즉시포착':s>=45?'🟠 유망':s>=25?'🟡 관찰':'⚫ 필터아웃';
+const oppClass = s => s>=70?'opp-red':s>=45?'opp-orange':s>=25?'opp-yellow':'opp-grey';
+const oppBorder = s => s>=70?'#ff4444':s>=45?'#ff8c00':s>=25?'#fbbf24':'#2a2a4a';
+
+// 종목 현재가 (2026.03 기준 추정 — 실제 확인 필요)
+const PRICES = {
+  NVDA:115, MSFT:395, GOOGL:175, SMCI:42, ANET:88, ARM:140,
+  AMD:105,  INTC:22,  ASML:720,  AMAT:165, TSM:185,
+  TSLA:250, RIVN:12,  LI:28,     ALB:95,   ON:62,   APTV:68,
+  COIN:210, MSTR:340, IBIT:38,   RIOT:9,   SQ:72,   CLSK:11,
+  XOM:118,  CVX:155,  OXY:52,    HAL:32,   SLB:44,  FSLR:165,
+  JPM:235,  BAC:44,   GS:530,    V:280,    'BRK.B':460, SCHW:78,
+  BABA:105, BIDU:88,  PDD:130,   FXI:28,   KWEB:32, JD:38,
+  ISRG:490, ABB:48,   TER:95,    RKLB:22,
+  LMT:480,  RTX:128,  NOC:510,   PLTR:85,  HII:220,
+};
+
+// 매입 시뮬 계산
+function calcBuy(ticker, dropPct, budget) {
+  const price = PRICES[ticker] || 100;
+  const dropPrice = Math.round(price * (1 - dropPct/100) * 100) / 100;  // 급락 후 예상가
+  const shares = Math.floor(budget / dropPrice);                          // 매입 가능 주수
+  const totalCost = Math.round(shares * dropPrice * 100) / 100;           // 실제 투자금
+  const recoveryVal = Math.round(shares * price * 100) / 100;             // 회복 시 가치
+  const profit = Math.round((recoveryVal - totalCost) * 100) / 100;       // 예상 수익
+  const profitPct = Math.round((profit / totalCost) * 1000) / 10;         // 수익률
+  return { price, dropPrice, shares, totalCost, recoveryVal, profit, profitPct };
+}
+
+function fmtUSD(n) {
+  if(n>=1000000) return '$'+(n/1000000).toFixed(2)+'M';
+  if(n>=1000) return '$'+(n/1000).toFixed(1)+'K';
+  return '$'+n.toFixed(2);
+}
+
+// 예산 입력 UI 공통 컴포넌트
+function budgetInput(onchange) {
+  return `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;
+      background:#08081c;border:1px solid #1a1a4a;border-radius:3px;margin-bottom:14px">
+      <span style="font-size:11px;color:#446;white-space:nowrap">💰 매입 예산</span>
+      <div style="display:flex;align-items:center;gap:6px;flex:1">
+        <span style="font-size:13px;color:#4a9eff;font-family:var(--mono)">$</span>
+        <input type="number" min="100" max="10000000" step="100"
+          value="${state.budget}"
+          oninput="state.budget=+this.value;${onchange}"
+          style="flex:1;background:#0d0d28;border:1px solid #1a1a4a;
+            color:#4a9eff;padding:6px 10px;font-size:13px;font-weight:bold;
+            border-radius:3px;font-family:var(--mono)">
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        ${[1000,5000,10000,50000].map(v=>`
+          <button onclick="state.budget=${v};${onchange}" style="
+            font-size:9px;padding:3px 8px;border-radius:2px;cursor:pointer;
+            border:1px solid ${state.budget===v?'#4a9eff':'#1a1a4a'};
+            background:${state.budget===v?'#0a1a3a':'transparent'};
+            color:${state.budget===v?'#4a9eff':'#446'};font-family:var(--mono)">
+            ${fmtUSD(v)}
+          </button>`).join('')}
+      </div>
+    </div>`;
+}
+
+// 종목 매입 계산 카드
+function buyCalcCard(ticker, dropPct) {
+  const b = calcBuy(ticker, dropPct, state.budget);
+  if(b.shares === 0) return `<div style="font-size:9px;color:#446;text-align:center;padding:4px">예산 부족 (최소 $${Math.ceil(b.dropPrice)})</div>`;
+  return `
+    <div style="margin-top:8px;padding:8px 10px;background:#0a1230;
+      border:1px solid #1a2a5a;border-radius:3px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div>
+          <div style="font-size:8px;color:#446;margin-bottom:2px">현재가 → 급락가</div>
+          <div style="font-size:11px;color:#aab;font-family:var(--mono)">
+            <span style="color:#fbbf24">${fmtUSD(b.price)}</span>
+            <span style="color:#446"> → </span>
+            <span style="color:#f87171">${fmtUSD(b.dropPrice)}</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:8px;color:#446;margin-bottom:2px">매입 주수</div>
+          <div style="font-size:13px;font-weight:bold;color:#4a9eff;font-family:var(--mono)">${b.shares.toLocaleString()}주</div>
+        </div>
+        <div>
+          <div style="font-size:8px;color:#446;margin-bottom:2px">투자금</div>
+          <div style="font-size:11px;color:#aab;font-family:var(--mono)">${fmtUSD(b.totalCost)}</div>
+        </div>
+        <div>
+          <div style="font-size:8px;color:#446;margin-bottom:2px">회복 시 예상 수익</div>
+          <div style="font-size:13px;font-weight:bold;color:#4ade80;font-family:var(--mono)">
+            +${fmtUSD(b.profit)}
+            <span style="font-size:9px;color:#4ade80"> (+${b.profitPct}%)</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+const oppBorder = s => s>=70?'#ff4444':s>=45?'#ff8c00':s>=25?'#fbbf24':'#2a2a4a';
+
+// 발언 순수 효과 계산 (발언 충격 - 시장 등락 - 섹터 등락 평균)
+function pureEffect(log){
+  if(log.drop<=0) return null; // 상승 발언은 순수효과 없음
+  const pe = log.drop - (log.spDrop||0) - ((log.sectorDrop||0)*0.3);
+  return Math.round(pe*10)/10;
+}
+function peLabel(pe){
+  if(pe===null) return null;
+  if(pe>=8) return {text:'발언 단독효과 높음',color:'#ff4444'};
+  if(pe>=4) return {text:'발언+시장 혼합',color:'#ff8c00'};
+  if(pe>=1) return {text:'발언 효과 미미',color:'#fbbf24'};
+  return {text:'시장 흐름 탓 (발언 무관)',color:'#4a9eff'};
+}
+
+function figStats(figId){
+  const fl = state.logs.filter(l=>l.figId===figId && l.drop>0);
+  if(!fl.length) return {avgDrop:0,avgRecovery:0,avgPureEffect:0,hitCount:0};
+  const pes = fl.map(l=>pureEffect(l)).filter(x=>x!==null);
+  return {
+    avgDrop: Math.round(fl.reduce((s,l)=>s+l.drop,0)/fl.length*10)/10,
+    avgRecovery: Math.round(fl.reduce((s,l)=>s+l.recovery,0)/fl.length),
+    avgPureEffect: pes.length ? Math.round(pes.reduce((s,x)=>s+x,0)/pes.length*10)/10 : 0,
+    hitCount: fl.length,
+  };
+}
+
+function getSortedFigs(){
+  return [...state.figs].map(fig=>{
+    const fl = state.logs.filter(l=>l.figId===fig.id && l.drop<2);
+    const decayed = Math.max(fig.base - fl.length*2, Math.round(fig.base*0.7));
+    return {...fig, inf: decayed};
+  }).sort((a,b)=>b.inf-a.inf);
+}
+
+function tempInfo(t){
+  if(t>=75) return {text:`과열 ${t}`,cls:'temp-hot'};
+  if(t>=55) return {text:`정상 ${t}`,cls:'temp-warm'};
+  if(t>=35) return {text:`냉각 ${t}`,cls:'temp-cool'};
+  return {text:`저온 ${t}`,cls:'temp-cold'};
+}
+
+function tag(text,color,sm){
+  return `<span class="tag" style="color:${color};border-color:${color}44;background:${color}15;font-size:${sm?'8px':'10px'}">${text}</span>`;
+}
+
+function bar(v,color,w=60){
+  const pct = Math.min(v,100);
+  const c = color||(v>=70?'#4ade80':v>=50?'#fbbf24':'#ef4444');
+  return `<div class="bar-wrap" style="width:${w}px"><div class="bar-fill" style="width:${pct}%;background:${c}"></div></div>`;
+}
+
+function avatar(fig){
+  return `<div class="avatar" style="background:${fig.color}1a;border:1px solid ${fig.color}44;color:${fig.color}">${fig.avatar}</div>`;
+}
+
+// ═══════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════
+let notifPermission = false;
+
+async function requestNotif(){
+  if(!('Notification' in window)) return;
+  const perm = await Notification.requestPermission();
+  notifPermission = perm === 'granted';
+  renderRadar();
+}
+
+function pushNotif(title, body, urgent){
+  const alert = {id:Date.now(), title, body, time:new Date().toLocaleTimeString('ko-KR',{hour12:false}), read:false};
+  state.alerts.unshift(alert);
+  if(state.alerts.length>50) state.alerts=state.alerts.slice(0,50);
+  save();
+  updateNotifBadge();
+  renderNotifPanel();
+
+  if(notifPermission && document.hidden){
+    new Notification('📡 ' + title, {body, icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%23ff4444"/><text y=".9em" font-size="90" x="10">📡</text></svg>'});
+  }
+}
+
+function updateNotifBadge(){
+  const unread = state.alerts.filter(a=>!a.read).length;
+  const badge = document.getElementById('notif-count');
+  if(unread>0){badge.style.display='flex';badge.textContent=unread>9?'9+':unread;}
+  else badge.style.display='none';
+}
+
+function toggleNotif(){
+  state.notifOpen = !state.notifOpen;
+  state.alerts.forEach(a=>a.read=true);
+  save();
+  updateNotifBadge();
+  const panel = document.getElementById('notif-panel');
+  panel.style.display = state.notifOpen?'block':'none';
+  renderNotifPanel();
+}
+
+function renderNotifPanel(){
+  const panel = document.getElementById('notif-panel');
+  if(!state.alerts.length){
+    panel.innerHTML=`<div style="padding:14px 16px;background:#07071a;border-bottom:1px solid #12123a;font-size:11px;color:#446">알림 없음</div>`;
+    return;
+  }
+  panel.innerHTML = state.alerts.slice(0,10).map(a=>`
+    <div class="notif-item">
+      <div style="color:#ff8c00;font-size:16px">📡</div>
+      <div>
+        <div style="color:#eeeeff;font-size:11px;font-family:sans-serif">${a.title}</div>
+        <div style="color:#889;font-size:10px;margin-top:2px;font-family:sans-serif">${a.body}</div>
+        <div style="color:#446;font-size:9px;margin-top:2px">${a.time}</div>
+      </div>
+    </div>`).join('');
+}
+
+// 24시간 모니터링 시뮬레이션 (30초마다 체크)
+let monitorInterval;
+function startMonitor(){
+  if(monitorInterval) clearInterval(monitorInterval);
+  monitorInterval = setInterval(()=>{
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+    // FOMC 일정 체크 (매달 특정 시간 시뮬)
+    if(h===9&&m===0&&s<30){
+      pushNotif('⚠ FOMC 시간 도달','Jerome Powell 발언 가능 구간 — 금리 관련 발언 주시');
+    }
+    // 랜덤 시뮬 알림 (데모용)
+    if(Math.random()<0.003){
+      const demos=[
+        {t:'📡 Musk X 게시물 감지',b:'@elonmusk — AI 관련 발언 포착. 즉시 확인 필요'},
+        {t:'📡 Trump Truth Social',b:'관세 관련 새 포스팅 감지 — 시장 영향 평가 필요'},
+        {t:'📡 Powell 발언 알림',b:'연준 관련 뉴스 헤드라인 — FINANCE 섹터 주시'},
+      ];
+      const d=demos[Math.floor(Math.random()*demos.length)];
+      pushNotif(d.t,d.b);
+    }
+  },30000);
+}
+
+// ═══════════════════════════════════════
+// TAB SYSTEM
+// ═══════════════════════════════════════
+function switchTab(name, btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  // find matching nav btn by onclick
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+    if(b.getAttribute('onclick')&&b.getAttribute('onclick').includes("'"+name+"'"))
+      b.classList.add('active');
+  });
+  state.currentTab = name;
+  render(name);
+}
+
+function render(name){
+  switch(name){
+    case 'radar': renderRadar(); break;
+    case 'stocks': renderStocks(); break;
+    case 'filter': renderFilter(); break;
+    case 'log': renderLog(); break;
+    case 'sim': renderSim(); break;
+    case 'map': renderMap(); break;
+  }
+}
+
+// ═══════════════════════════════════════
+// RENDER: RADAR
+// ═══════════════════════════════════════
+function renderRadar(){
+  const figs = getSortedFigs();
+  const sel = figs.find(f=>f.id===state.selFigId)||figs[0];
+
+  document.getElementById('tab-radar').innerHTML = `
+    <div class="sec">📡 영향력 레이더 — ${figs.length}명 감시 중 · 자동 점수 붕괴 적용</div>
+
+    ${!notifPermission?`
+    <div style="background:#120a00;border:1px solid #ff8c0044;border-radius:4px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:11px;color:#ff8c00;font-family:sans-serif">📲 모바일 푸시 알림을 활성화하면 24시간 발언 감시가 가능합니다</span>
+      <button class="btn btn-blue" style="padding:5px 12px;font-size:9px;white-space:nowrap" onclick="requestNotif()">알림 ON</button>
+    </div>`:''}
+
+    <div style="margin-bottom:12px">
+      ${figs.map((fig,i)=>{
+        const st = figStats(fig.id);
+        const typeColor = fig.chType==='소셜직접형'?'#ff4444':fig.chType==='기관성명형'?'#4a9eff':fig.chType==='이벤트발표형'?'#76b900':'#fbbf24';
+        return `
+        <div class="fig-row ${fig.id===state.selFigId?'selected':''}" 
+             style="--sel-color:${fig.color}" onclick="selFig(${fig.id})">
+          <span style="font-size:9px;color:#334;min-width:18px">#${i+1}</span>
+          ${avatar(fig)}
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:12px;color:#eeeeff;font-family:sans-serif">${fig.name}</span>
+              <span style="font-size:12px">${fig.country}</span>
+              ${tag(fig.chType,typeColor,true)}
+            </div>
+            <div style="margin-top:4px">${bar(fig.inf,fig.color,100)}</div>
+            ${st.hitCount>0?`
+            <div style="display:flex;gap:10px;margin-top:3px">
+              <span style="font-size:8px;color:#446">충격 <span style="color:#f87171">-${st.avgPureEffect>0?st.avgPureEffect:st.avgDrop}%</span>(순수)</span>
+              <span style="font-size:8px;color:#446">회복 <span style="color:#fbbf24">${st.avgRecovery}일</span></span>
+            </div>`:''}
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div class="score-big" style="color:${fig.color};font-size:20px">${fig.inf}</div>
+            <div style="font-size:8px;color:${fig.inf<fig.base?'#f87171':fig.inf>fig.base?'#4ade80':'#446'}">
+              ${fig.inf<fig.base?`▼${fig.base-fig.inf}`:fig.inf>fig.base?`▲${fig.inf-fig.base}`:'–'}
+            </div>
+          </div>
+        </div>`}).join('')}
+    </div>
+
+    <!-- SELECTED DETAIL -->
+    ${renderFigDetail(sel)}
+  `;
+}
+
+function renderFigDetail(fig){
+  const st = figStats(fig.id);
+  return `
+    <div class="card" style="border-top:2px solid ${fig.color}">
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+        ${avatar(fig)}
+        <div style="flex:1">
+          <div style="font-size:14px;color:#eeeeff;font-family:sans-serif">${fig.name} ${fig.country}</div>
+          <div style="font-size:10px;color:#556;font-family:sans-serif">${fig.title}</div>
+        </div>
+        <div class="score-big" style="color:${fig.color}">${fig.inf}</div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div class="sec">감시 채널 (우선순위)</div>
+        ${fig.ch.map((c,i)=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;
+            background:#0a0a1e;border:1px solid ${i===0?fig.color+'33':'#12123a'};
+            border-radius:3px;margin-bottom:5px">
+            <span style="width:18px;height:18px;border-radius:50%;background:${i===0?fig.color+'22':'#0d0d28'};
+              border:1px solid ${i===0?fig.color:'#1a1a3a'};display:flex;align-items:center;
+              justify-content:center;font-size:8px;color:${i===0?fig.color:'#446'};flex-shrink:0">${i+1}</span>
+            <span style="font-size:11px;color:${i===0?'#eeeeff':'#889'};font-family:sans-serif">${c}</span>
+          </div>`).join('')}
+      </div>
+      <div>
+        <div class="sec">영향 섹터 (탭하면 종목 분석)</div>
+        <div class="grid2">
+          ${fig.sec.map(s=>{
+            const sd=SM[s]; if(!sd) return '';
+            const ti=tempInfo(sd.temp);
+            return `
+            <div style="padding:10px;background:#0a0a1e;border:1px solid ${sd.color}22;
+              border-top:2px solid ${sd.color};border-radius:3px;cursor:pointer"
+              onclick="goToSector('${s}')">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-size:10px;color:${sd.color}">${sd.label}</span>
+                <span class="tag ${ti.cls}" style="font-size:7px;padding:1px 5px;border:none;background:none">${ti.text}</span>
+              </div>
+              ${sd.d.slice(0,2).map(st=>`
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                  <span style="font-size:9px;color:#aab">${st.t}</span>
+                  ${bar(st.f,st.f>=70?'#4ade80':st.f>=50?'#fbbf24':'#ef4444',45)}
+                </div>`).join('')}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+function selFig(id){
+  state.selFigId = id;
+  renderRadar();
+}
+
+function goToSector(s){
+  state.selSector = s;
+  switchTab('stocks', null);
+}
+
+// ═══════════════════════════════════════
+// RENDER: STOCKS
+// ═══════════════════════════════════════
+function renderStocks(){
+  const sd = SM[state.selSector];
+  const fig = getSortedFigs().find(f=>f.id===state.selFigId)||getSortedFigs()[0];
+
+  // 전체 종목 순위 계산
+  const allStocks = Object.entries(SM).flatMap(([sec,sv])=>[
+    ...sv.d.map(s=>({...s,secKey:sec,secLabel:sv.label,secColor:sv.color,type:'직접'})),
+    ...sv.i.map(s=>({...s,secKey:sec,secLabel:sv.label,secColor:sv.color,type:'간접'})),
+  ]);
+  // 중복 제거 (같은 티커는 가장 높은 펀더멘털 기준)
+  const seen={};
+  const unique = allStocks.filter(s=>{
+    if(seen[s.t]) return false; seen[s.t]=1; return true;
+  });
+  const ranked = unique
+    .map(s=>({...s, os:opp(fig.inf,s.f,state.simDrop)}))
+    .sort((a,b)=>b.os-a.os);
+
+  document.getElementById('tab-stocks').innerHTML = `
+    <div class="sec">종목 분석 — 직접 / 간접 영향</div>
+    
+    <!-- 인물 선택 -->
+    <div style="margin-bottom:10px">
+      <label style="font-size:9px;color:#446;letter-spacing:1px;display:block;margin-bottom:5px">기준 인물</label>
+      <select onchange="state.selFigId=+this.value;renderStocks()" style="background:#0d0d28;border:1px solid #12123a;color:#aab;padding:6px 10px;font-size:11px;border-radius:3px;font-family:var(--mono);width:100%">
+        ${getSortedFigs().map(f=>`<option value="${f.id}" ${f.id===state.selFigId?'selected':''}>${f.name} (${f.inf}점)</option>`).join('')}
+      </select>
+    </div>
+
+    <!-- 예산 입력 -->
+    ${budgetInput('renderStocks()')}
+
+    <!-- SECTOR SELECTOR -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+      ${Object.entries(SM).map(([k,v])=>`
+        <button onclick="selSector('${k}')" style="font-size:9px;padding:4px 10px;
+          border:1px solid ${k===state.selSector?v.color:'#12123a'};
+          background:${k===state.selSector?v.color+'15':'transparent'};
+          color:${k===state.selSector?v.color:'#446'};
+          cursor:pointer;border-radius:2px;font-family:var(--mono)">${v.label}</button>
+      `).join('')}
+    </div>
+
+    <!-- SECTOR HEADER -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;
+      padding:10px 12px;background:${sd.color}0d;border:1px solid ${sd.color}33;border-radius:4px">
+      <div style="width:10px;height:10px;border-radius:50%;background:${sd.color}"></div>
+      <span style="font-size:14px;color:#eeeeff;font-family:sans-serif">${sd.label}</span>
+      <span class="tag ${tempInfo(sd.temp).cls}" style="border:none;background:none;font-size:9px">${tempInfo(sd.temp).text}</span>
+      <span style="margin-left:auto;font-size:9px;color:#446">기준: <span style="color:${fig.color}">${fig.name}</span> · 가정 -${state.simDrop}%</span>
+    </div>
+
+    <div style="font-size:10px;color:#4a9eff;margin-bottom:8px">▶ 직접 영향 종목</div>
+    ${renderStockList(sd.d,'direct',sd,fig)}
+    
+    <div style="font-size:10px;color:#556;margin-bottom:8px;margin-top:14px">▷ 간접 영향 종목</div>
+    ${renderStockList(sd.i,'indirect',sd,fig)}
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- 전체 종목 기회점수 순위               -->
+    <!-- ══════════════════════════════════════ -->
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid #1a1a4a">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-size:13px;color:#eeeeff;font-family:sans-serif">📊 전체 종목 기회점수 순위</div>
+          <div style="font-size:10px;color:#446;margin-top:3px">
+            ${fig.name} (${fig.inf}pt) 기준 · 가정 하락 -${state.simDrop}% · 
+            <span style="color:#4a9eff">총 ${ranked.length}종목</span>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:9px;color:#446;margin-bottom:4px">가정 하락폭</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="range" min="5" max="40" value="${state.simDrop}"
+              oninput="state.simDrop=+this.value;renderStocks()"
+              style="width:80px;accent-color:#ff8c00">
+            <span style="font-size:11px;color:#ff8c00;font-family:var(--mono);min-width:30px">-${state.simDrop}%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 범례 -->
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;
+        padding:8px 12px;background:#08081c;border-radius:3px">
+        <span style="font-size:9px;color:#446">점수 = (영향력/100) × (펀더멘털/100) × 하락폭 × 10</span>
+        <span style="font-size:9px;color:#ff4444">🔴 70↑ 즉시포착</span>
+        <span style="font-size:9px;color:#ff8c00">🟠 45~69 유망</span>
+        <span style="font-size:9px;color:#fbbf24">🟡 25~44 관찰</span>
+        <span style="font-size:9px;color:#446">⚫ 25↓ 제외</span>
+      </div>
+
+      <!-- 헤더 행 -->
+      <div style="display:grid;grid-template-columns:28px 58px 1fr 70px 45px 50px 75px 1fr;
+        gap:8px;padding:6px 10px;font-size:8px;color:#446;letter-spacing:1px;
+        border-bottom:1px solid #12123a;margin-bottom:4px">
+        <span>#</span><span>티커</span><span>종목명</span>
+        <span>섹터</span><span>펀더멘털</span><span>점수</span><span>판정</span>
+        <span>💰 매입예산 ${fmtUSD(state.budget)} 기준</span>
+      </div>
+
+      ${ranked.map((s,i)=>{
+        const b = calcBuy(s.t, state.simDrop, state.budget);
+        return `
+        <div style="display:grid;grid-template-columns:28px 58px 1fr 70px 45px 50px 75px 1fr;
+          gap:8px;align-items:center;padding:9px 10px;margin-bottom:3px;
+          background:${s.os>=70?'#1a0808':s.os>=45?'#120c04':'#08081c'};
+          border:1px solid ${s.os>=70?'#ff444422':s.os>=45?'#ff8c0015':'#0d0d28'};
+          border-left:3px solid ${oppBorder(s.os)};border-radius:3px">
+          <span style="font-size:10px;color:#334;font-family:var(--mono)">${i+1}</span>
+          <div>
+            <div style="font-size:13px;font-weight:bold;color:${oppBorder(s.os)};font-family:var(--mono)">${s.t}</div>
+            <div style="font-size:8px;color:#556;font-family:var(--mono)">${fmtUSD(b.price)}</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:#aab;font-family:sans-serif">${s.n}</div>
+            <div style="font-size:8px;color:#446;font-family:sans-serif;margin-top:1px">${s.note}</div>
+          </div>
+          <div style="font-size:9px;padding:2px 6px;border-radius:2px;
+            background:${s.secColor}15;color:${s.secColor};
+            border:1px solid ${s.secColor}33;text-align:center;font-family:sans-serif">${s.secLabel}</div>
+          <div style="display:flex;flex-direction:column;gap:3px;align-items:center">
+            ${bar(s.f,s.f>=70?'#4ade80':s.f>=50?'#fbbf24':'#ef4444',40)}
+            <span style="font-size:9px;color:${s.f>=70?'#4ade80':s.f>=50?'#fbbf24':'#ef4444'};font-family:var(--mono)">${s.f}</span>
+          </div>
+          <div style="text-align:center">
+            <div class="${oppClass(s.os)}" style="font-size:18px;font-weight:bold;font-family:var(--mono);line-height:1">${s.os}</div>
+          </div>
+          <div style="font-size:9px;color:${oppBorder(s.os)}">${oppLabel(s.os)}</div>
+          <div style="background:#0a1230;border:1px solid #1a2a5a;border-radius:3px;padding:6px 8px">
+            ${b.shares>0?`
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="font-size:8px;color:#446">급락가</span>
+                <span style="font-size:9px;color:#f87171;font-family:var(--mono)">${fmtUSD(b.dropPrice)}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="font-size:8px;color:#446">${b.shares}주 매입</span>
+                <span style="font-size:9px;color:#4a9eff;font-family:var(--mono)">${fmtUSD(b.totalCost)}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-size:8px;color:#446">회복 수익</span>
+                <span style="font-size:10px;font-weight:bold;color:#4ade80;font-family:var(--mono)">+${fmtUSD(b.profit)}</span>
+              </div>`
+            :`<div style="font-size:8px;color:#446;text-align:center">예산 부족</div>`}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderStockList(stocks, type, sd, fig){
+  return stocks.map(s=>{
+    const os = opp(fig.inf, s.f, state.simDrop);
+    const bc = type==='direct'?sd.color:'#2a2a4a';
+    return `
+    <div class="card card-border-l" style="border-left-color:${bc};margin-bottom:8px;
+      background:${os>=70?'#1a0808':os>=45?'#120c04':'var(--panel)'}">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <div style="min-width:55px">
+          <div style="font-size:14px;font-weight:bold;color:${type==='direct'?sd.color:'#88a'};font-family:var(--mono)">${s.t}</div>
+          <div style="font-size:8px;color:#446">${s.mc}</div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:#aab;font-family:sans-serif">${s.n}</div>
+          <div style="font-size:9px;color:#556;font-family:sans-serif;margin-top:2px">${s.note}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+            <span style="font-size:8px;color:#446">펀더멘털</span>
+            ${bar(s.f,s.f>=70?'#4ade80':s.f>=50?'#fbbf24':'#ef4444',60)}
+            <span style="font-size:9px;color:${s.f>=70?'#4ade80':s.f>=50?'#fbbf24':'#ef4444'};font-family:var(--mono)">${s.f}</span>
+          </div>
+        </div>
+        <div style="text-align:center;min-width:50px">
+          <div class="${oppClass(os)}" style="font-size:22px;font-weight:bold;font-family:var(--mono)">${os}</div>
+          <div style="font-size:8px;color:#446;margin-top:2px">${oppLabel(os)}</div>
+        </div>
+      </div>
+      ${state.budget>0 ? buyCalcCard(s.t, state.simDrop) : ''}
+    </div>`;
+  }).join('');
+}
+
+function selSector(s){
+  state.selSector = s;
+  renderStocks();
+}
+
+// ═══════════════════════════════════════
+// RENDER: FILTER
+// ═══════════════════════════════════════
+function renderFilter(){
+  const fig = getSortedFigs().find(f=>f.id===state.simFigId)||getSortedFigs()[0];
+  const allStocks = Object.entries(SM).flatMap(([sec,sd])=>[
+    ...sd.d.map(s=>({...s,secLabel:sd.label,type:'직접'})),
+    ...sd.i.map(s=>({...s,secLabel:sd.label,type:'간접'})),
+  ]);
+  const seen={};
+  const unique = allStocks.filter(s=>{ if(seen[s.t]) return false; seen[s.t]=1; return true; });
+  const result = unique.filter(s=>s.f>=state.fundMin)
+    .map(s=>({...s,os:opp(fig.inf,s.f,state.simDrop)}))
+    .sort((a,b)=>b.os-a.os);
+
+  document.getElementById('tab-filter').innerHTML = `
+    <div class="sec">기회 점수 필터</div>
+    
+    ${budgetInput('renderFilter()')}
+
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:14px;margin-bottom:14px">
+      <div style="margin-bottom:12px">
+        <label>기준 인물</label>
+        <select onchange="state.simFigId=+this.value;renderFilter()">
+          ${getSortedFigs().map(f=>`<option value="${f.id}" ${f.id===state.simFigId?'selected':''}>${f.name} (${f.inf}점)</option>`).join('')}
+        </select>
+      </div>
+      <div style="margin-bottom:12px">
+        <label>펀더멘털 최소: <span style="color:#4a9eff">${state.fundMin}점</span> 이상만</label>
+        <input type="range" min="0" max="100" value="${state.fundMin}" 
+          oninput="state.fundMin=+this.value;this.previousElementSibling.querySelector('span').textContent=this.value+'점';renderFilter()" 
+          style="accent-color:#4a9eff">
+      </div>
+      <div>
+        <label>가정 하락폭: <span style="color:#ff8c00">-${state.simDrop}%</span></label>
+        <input type="range" min="5" max="40" value="${state.simDrop}" 
+          oninput="state.simDrop=+this.value;this.previousElementSibling.querySelector('span').textContent='-'+this.value+'%';renderFilter()" 
+          style="accent-color:#ff8c00">
+      </div>
+    </div>
+
+    <div style="font-size:10px;color:#4a9eff;margin-bottom:10px">${result.length}종목 통과</div>
+
+    ${result.length===0?`<div style="text-align:center;padding:30px;color:#334;font-size:12px">조건에 맞는 종목 없음</div>`:''}
+    ${result.map(s=>`
+      <div class="card card-border-l" style="border-left-color:${oppBorder(s.os)};
+        background:${s.os>=70?'#1a0808':s.os>=45?'#120c04':'var(--panel)'}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="min-width:55px">
+            <div style="font-size:14px;font-weight:bold;color:${oppBorder(s.os)};font-family:var(--mono)">${s.t}</div>
+            <div style="font-size:8px;color:#446">${s.type} · ${s.secLabel}</div>
+            <div style="font-size:8px;color:#556;font-family:var(--mono);margin-top:1px">${fmtUSD(PRICES[s.t]||0)}</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:11px;color:#aab;font-family:sans-serif">${s.n}</div>
+            <div style="font-size:9px;color:#556;font-family:sans-serif">${s.note}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
+              ${bar(s.f,s.f>=70?'#4ade80':s.f>=50?'#fbbf24':'#ef4444',50)}
+              <span style="font-size:9px;color:#aab;font-family:var(--mono)">${s.f}</span>
+            </div>
+          </div>
+          <div style="text-align:center">
+            <div class="${oppClass(s.os)}" style="font-size:22px;font-weight:bold;font-family:var(--mono)">${s.os}</div>
+            <div style="font-size:8px;color:#446">${oppLabel(s.os)}</div>
+          </div>
+        </div>
+        ${state.budget>0 ? buyCalcCard(s.t, state.simDrop) : ''}
+      </div>`).join('')}
+
+    <div class="card" style="margin-top:16px">
+      <div class="sec">공식</div>
+      <div style="font-size:11px;color:#889">기회점수 = (영향력/100) × (펀더멘털/100) × 하락폭 × 10</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+        ${[['🔴 즉시포착','70↑'],['🟠 유망','45~69'],['🟡 관찰','25~44'],['⚫ 제외','25↓']].map(([l,r])=>
+          `<span style="font-size:9px;color:#667">${l} <span style="color:#aab">${r}</span></span>`
+        ).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════
+// RENDER: LOG
+// ═══════════════════════════════════════
+function renderLog(){
+  document.getElementById('tab-log').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="sec" style="margin:0;border:none;padding:0">발언 히스토리 로그</div>
+      <button class="btn btn-blue" onclick="toggleLogForm()">+ 발언 추가</button>
+    </div>
+
+    <div id="log-form" style="display:none;background:var(--panel);border:1px solid var(--border);
+      border-radius:4px;padding:14px;margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><label>인물</label>
+          <select id="lf-fig">
+            ${getSortedFigs().map(f=>`<option value="${f.id}">${f.name}</option>`).join('')}
+          </select>
+        </div>
+        <div><label>날짜</label><input type="date" id="lf-date" value="${new Date().toISOString().slice(0,10)}"></div>
+        <div><label>유형</label>
+          <select id="lf-type">
+            <option>부정</option><option>긍정</option><option>애매</option>
+          </select>
+        </div>
+        <div><label>종목 (쉼표 구분)</label><input id="lf-tickers" placeholder="NVDA,TSLA,..."></div>
+      </div>
+      <div style="margin-bottom:10px"><label>발언 내용</label><input id="lf-stmt" placeholder="발언 요약..."></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label>종목 하락폭: <span id="lf-drop-v">10</span>%</label>
+          <input type="range" min="0" max="40" value="10" id="lf-drop" 
+            oninput="document.getElementById('lf-drop-v').textContent=this.value" style="accent-color:#ff4444">
+        </div>
+        <div>
+          <label>S&P500 당일: <span id="lf-sp-v">1</span>%</label>
+          <input type="range" min="0" max="15" value="1" id="lf-sp"
+            oninput="document.getElementById('lf-sp-v').textContent=this.value" style="accent-color:#4a9eff">
+        </div>
+        <div>
+          <label>섹터평균: <span id="lf-sec-v">2</span>%</label>
+          <input type="range" min="0" max="20" value="2" id="lf-sec"
+            oninput="document.getElementById('lf-sec-v').textContent=this.value" style="accent-color:#a78bfa">
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <label>회복일: <span id="lf-rec-v">0</span>일</label>
+        <input type="range" min="0" max="90" value="0" id="lf-rec"
+          oninput="document.getElementById('lf-rec-v').textContent=this.value" style="accent-color:#fbbf24">
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:#aab">
+          <input type="checkbox" id="lf-ver" style="accent-color:#4ade80"> 검증 완료
+        </label>
+        <div style="display:flex;gap:8px">
+          <button class="btn" style="border-color:#446;color:#446" onclick="toggleLogForm()">취소</button>
+          <button class="btn btn-green" onclick="saveLog()">저장</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 순수효과 설명 -->
+    <div class="card" style="margin-bottom:14px;border-left:3px solid #4a9eff">
+      <div style="font-size:10px;color:#4a9eff;margin-bottom:6px">📐 발언 순수 효과란?</div>
+      <div style="font-size:10px;color:#889;font-family:sans-serif;line-height:1.6">
+        순수효과 = 종목 하락폭 − S&P500 등락 − (섹터평균 × 0.3)<br>
+        <span style="color:#ff4444">8%↑</span> 발언 단독효과 · 
+        <span style="color:#ff8c00">4~8%</span> 발언+시장 혼합 · 
+        <span style="color:#fbbf24">1~4%</span> 효과 미미 · 
+        <span style="color:#4a9eff">1%↓</span> 시장 탓 (발언 무관)
+      </div>
+    </div>
+
+    <!-- LOG LIST -->
+    ${state.logs.sort((a,b)=>b.date.localeCompare(a.date)).map(log=>{
+      const fig = state.figs.find(f=>f.id===log.figId)||{name:'?',color:'#888',avatar:'?'};
+      const tc = log.type==='부정'?'#ff4444':log.type==='긍정'?'#4ade80':'#fbbf24';
+      const pe = pureEffect(log);
+      const pel = peLabel(pe);
+      return `
+      <div class="card card-border-l" style="border-left-color:${tc};margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          ${avatar(fig)}
+          <div style="flex:1">
+            <div style="font-size:12px;color:#eeeeff;font-family:sans-serif">${fig.name}</div>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:3px">
+              ${tag(log.type,tc,true)}
+              <span style="font-size:9px;color:#446">${log.date}</span>
+              ${log.verified?tag('✓ 검증','#4ade80',true):tag('? 미검증','#f97316',true)}
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:16px;font-weight:bold;color:${log.drop>0?'#f87171':'#4ade80'};font-family:var(--mono)">
+              ${log.drop>0?'-':''}${Math.abs(log.drop)}%
+            </div>
+            ${log.recovery>0?`<div style="font-size:9px;color:#fbbf24">${log.recovery}일 회복</div>`:''}
+          </div>
+        </div>
+        <div style="font-size:11px;color:#aab;font-family:sans-serif;margin-bottom:8px">"${log.stmt}"</div>
+        ${log.drop>0?`
+        <div class="pure-effect">
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:6px">
+            <span style="font-size:9px;color:#446">종목하락 <span style="color:#f87171">-${log.drop}%</span></span>
+            <span style="font-size:9px;color:#446">S&P500 <span style="color:#4a9eff">-${log.spDrop||0}%</span></span>
+            <span style="font-size:9px;color:#446">섹터평균 <span style="color:#a78bfa">-${log.sectorDrop||0}%</span></span>
+          </div>
+          ${pel?`
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:9px;color:#446">순수효과</span>
+            <span style="font-size:13px;font-weight:bold;color:${pel.color};font-family:var(--mono)">${pe}%</span>
+            <span style="font-size:9px;color:${pel.color};font-family:sans-serif">${pel.text}</span>
+          </div>`:''}
+        </div>`:''}
+        ${log.tickers?`<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+          ${(typeof log.tickers==='string'?log.tickers.split(','):log.tickers).filter(Boolean).map(t=>
+            `<span style="font-size:9px;color:#4a9eff;font-family:var(--mono)">${t.trim()}</span>`
+          ).join('')}
+        </div>`:''}
+      </div>`;
+    }).join('')}
+
+    <!-- 인물별 순수효과 통계 -->
+    <div style="margin-top:20px">
+      <div class="sec">인물별 순수 충격파 통계 (로그 기반)</div>
+      <div class="grid2">
+        ${getSortedFigs().filter(f=>figStats(f.id).hitCount>0).map(fig=>{
+          const st=figStats(fig.id);
+          return `
+          <div class="card" style="border-top:2px solid ${fig.color}">
+            <div style="font-size:11px;color:${fig.color};margin-bottom:8px;font-family:sans-serif">${fig.name}</div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-size:9px;color:#446">순수 충격</span>
+                <span style="font-size:10px;color:#ff4444;font-family:var(--mono)">-${st.avgPureEffect}%</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-size:9px;color:#446">전체 하락</span>
+                <span style="font-size:10px;color:#f87171;font-family:var(--mono)">-${st.avgDrop}%</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-size:9px;color:#446">평균 회복</span>
+                <span style="font-size:10px;color:#fbbf24;font-family:var(--mono)">${st.avgRecovery}일</span>
+              </div>
+              <div style="display:flex;justify-content:space-between">
+                <span style="font-size:9px;color:#446">기록</span>
+                <span style="font-size:10px;color:#4a9eff;font-family:var(--mono)">${st.hitCount}건</span>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function toggleLogForm(){
+  const f = document.getElementById('log-form');
+  if(f) f.style.display = f.style.display==='none'?'block':'none';
+}
+
+function saveLog(){
+  const figId = +document.getElementById('lf-fig').value;
+  const stmt = document.getElementById('lf-stmt').value.trim();
+  if(!stmt){ alert('발언 내용을 입력하세요'); return; }
+  const log = {
+    id: Date.now(), figId,
+    date: document.getElementById('lf-date').value,
+    type: document.getElementById('lf-type').value,
+    stmt,
+    tickers: document.getElementById('lf-tickers').value,
+    drop: +document.getElementById('lf-drop').value,
+    spDrop: +document.getElementById('lf-sp').value,
+    sectorDrop: +document.getElementById('lf-sec').value,
+    recovery: +document.getElementById('lf-rec').value,
+    verified: document.getElementById('lf-ver').checked,
+  };
+  state.logs.unshift(log);
+  save();
+  const fig = state.figs.find(f=>f.id===figId);
+  const pe = pureEffect(log);
+  const pel = peLabel(pe);
+  if(pel && pe>=4){
+    pushNotif(`📡 ${fig?.name} 발언 로그 추가`, `${stmt} — 순수효과 ${pe}% (${pel.text})`);
+  }
+  renderLog();
+}
+
+// ═══════════════════════════════════════
+// RENDER: SIM
+// ═══════════════════════════════════════
+function renderSim(){
+  const fig = getSortedFigs().find(f=>f.id===state.simFigId)||getSortedFigs()[0];
+  const sd = SM[state.simSector];
+  const st = figStats(fig.id);
+  const estDrop = st.avgPureEffect>0?st.avgPureEffect:st.avgDrop>0?st.avgDrop:10;
+  const allS = [...sd.d.map(s=>({...s,type:'직접'})),...sd.i.map(s=>({...s,type:'간접'}))];
+  const result = allS.map(s=>({...s,os:opp(fig.inf,s.f,estDrop)})).sort((a,b)=>b.os-a.os);
+
+  document.getElementById('tab-sim').innerHTML = `
+    <div class="sec">알림 시뮬레이터</div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div><label>가상 발언 인물</label>
+        <select onchange="state.simFigId=+this.value;renderSim()">
+          ${getSortedFigs().map(f=>`<option value="${f.id}" ${f.id===state.simFigId?'selected':''}>${f.name}</option>`).join('')}
+        </select>
+      </div>
+      <div><label>타깃 섹터</label>
+        <select onchange="state.simSector=this.value;renderSim()">
+          ${Object.entries(SM).map(([k,v])=>`<option value="${k}" ${k===state.simSector?'selected':''}>${v.label}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    <div class="card card-border-l" style="border-left-color:${fig.color};margin-bottom:14px">
+      <div style="font-size:10px;color:#446;margin-bottom:8px">시나리오</div>
+      <div style="font-size:13px;color:#eeeeff;font-family:sans-serif;line-height:1.7">
+        <span style="color:${fig.color}">${fig.name}</span>이(가)
+        <span style="color:${sd.color}">${sd.label}</span> 관련 <span style="color:#ff4444">부정 발언</span>을 했다면?
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px">
+        <span style="font-size:10px;color:#446">영향력 <span style="color:${fig.color}">${fig.inf}pt</span></span>
+        <span style="font-size:10px;color:#446">예상 순수하락 <span style="color:#f87171">-${estDrop}%</span>
+          ${st.hitCount>0?`<span style="color:#446;font-size:8px"> (과거 평균 기반)</span>`:''}</span>
+        <span style="font-size:10px;color:#446">예상 회복 <span style="color:#fbbf24">${st.avgRecovery>0?st.avgRecovery+'일':'데이터 부족'}</span></span>
+      </div>
+    </div>
+
+    <button class="btn btn-red" style="width:100%;margin-bottom:14px" 
+      onclick="testAlert('${fig.name}','${sd.label}',${estDrop})">
+      📡 지금 이 시나리오로 테스트 알림 발송
+    </button>
+
+    <div class="sec">영향 예상 종목 (기회점수 순)</div>
+    ${result.map(s=>`
+      <div class="card card-border-l" style="border-left-color:${oppBorder(s.os)};margin-bottom:8px;
+        background:${s.os>=70?'#1a0808':s.os>=45?'#120c04':'var(--panel)'}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="min-width:55px">
+            <div style="font-size:14px;font-weight:bold;color:${oppBorder(s.os)};font-family:var(--mono)">${s.t}</div>
+            ${tag(s.type,s.type==='직접'?sd.color:'#556',true)}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:11px;color:#aab;font-family:sans-serif">${s.n}</div>
+            <div style="font-size:9px;color:#556;font-family:sans-serif">${s.note}</div>
+            <div style="font-size:9px;color:#446;margin-top:3px">
+              예상 하락 <span style="color:#f87171">-${estDrop}%</span>
+              · 회복 <span style="color:#fbbf24">${st.avgRecovery>0?st.avgRecovery+'일':'미상'}</span>
+            </div>
+          </div>
+          <div style="text-align:center;min-width:50px">
+            <div class="${oppClass(s.os)}" style="font-size:20px;font-weight:bold;font-family:var(--mono)">${s.os}</div>
+            <div style="font-size:8px;color:#446">${oppLabel(s.os)}</div>
+          </div>
+        </div>
+      </div>`).join('')}
+  `;
+}
+
+function testAlert(figName, sectorLabel, drop){
+  pushNotif(`📡 시뮬 알림: ${figName}`, `${sectorLabel} 관련 부정 발언 가정 — 예상 순수하락 -${drop}%`);
+  alert(`✅ 알림 발송 완료!\n\n상단 🔔 아이콘에서 확인하세요.\n모바일에서 알림 ON 시 푸시 알림도 도착합니다.`);
+}
+
+// ═══════════════════════════════════════
+// RENDER: MAP
+// ═══════════════════════════════════════
+function renderMap(){
+  const figs = getSortedFigs().filter(f=>f.rel&&f.rel.length>0);
+  document.getElementById('tab-map').innerHTML = `
+    <div class="sec">인물 연관성 맵 — 동맹·갈등·협력</div>
+    
+    <div class="card" style="margin-bottom:14px;border-left:3px solid #4a9eff">
+      <div style="font-size:10px;color:#4a9eff;margin-bottom:8px">루이 활용 가이드</div>
+      ${[
+        ['갈등 발생 감지','갈등 인물 공통 섹터 종목 즉시 모니터링'],
+        ['연출 갈등 판단','갈등→급락→3주 내 화해→회복 반복 = 연출 의심'],
+        ['협력 강화 감지','협력 강화 → 공통 섹터 긍정 신호'],
+      ].map(([t,d])=>`
+        <div style="display:flex;gap:10px;margin-bottom:5px">
+          <span style="font-size:10px;color:#4a9eff;min-width:100px;font-family:sans-serif">${t}</span>
+          <span style="font-size:10px;color:#889;font-family:sans-serif">${d}</span>
+        </div>`).join('')}
+    </div>
+
+    ${figs.map(fig=>`
+      <div class="card" style="margin-bottom:10px;border-top:2px solid ${fig.color}">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          ${avatar(fig)}
+          <span style="font-size:13px;color:#eeeeff;font-family:sans-serif">${fig.name}</span>
+          <span style="margin-left:auto;font-size:18px;font-weight:bold;color:${fig.color};font-family:var(--mono)">${fig.inf}</span>
+        </div>
+        ${fig.rel.map(rel=>{
+          const target = state.figs.find(f=>f.id===rel.to);
+          if(!target) return '';
+          const rc = rel.type==='동맹'?'#4ade80':rel.type==='갈등'?'#f87171':rel.type==='협력'?'#60a5fa':'#fbbf24';
+          const commonSecs = [...new Set([...fig.sec,...(target.sec||[])])].slice(0,3);
+          return `
+          <div style="padding:10px 12px;background:#0a0a1e;border:1px solid ${rc}22;
+            border-left:3px solid ${rc};border-radius:3px;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:${rel.type==='갈등'?8:0}px">
+              ${tag(rel.type,rc,true)}
+              <span style="font-size:11px;color:#aab;font-family:sans-serif">${target.name}</span>
+              <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+                <div style="height:3px;width:50px;background:#0d0d28;border-radius:1px">
+                  <div style="height:100%;width:${rel.str}%;background:${rc};border-radius:1px"></div>
+                </div>
+                <span style="font-size:9px;color:${rc};font-family:var(--mono)">${rel.str}</span>
+              </div>
+            </div>
+            ${rel.type==='갈등'?`
+            <div>
+              <div style="font-size:8px;color:#446;margin-bottom:4px">갈등 시 피해 예상</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                ${commonSecs.map(s=>{
+                  const sd=SM[s]; if(!sd) return '';
+                  return `<div style="font-size:8px;padding:2px 7px;background:${sd.color}15;
+                    border:1px solid ${sd.color}33;color:${sd.color};border-radius:2px">
+                    ${sd.label} · ${sd.d[0]?.t}</div>`;
+                }).join('')}
+              </div>
+            </div>`:''}
+          </div>`;
+        }).join('')}
+      </div>`).join('')}
+  `;
+}
+
+// ═══════════════════════════════════════
+// CLOCK + INIT
+// ═══════════════════════════════════════
+function updateClock(){
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleString('ko-KR',{hour12:false,month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+function buildDesktopNav(){
+  const tabs = [['radar','레이더'],['stocks','종목'],['filter','기회필터'],['log','발언로그'],['sim','시뮬레이터'],['map','연관맵']];
+  document.getElementById('tab-nav-desktop').innerHTML = tabs.map(([k,l])=>`
+    <button class="btn dsk-tab-btn" data-tab="${k}" onclick="switchTab('${k}',null)"
+      style="border-color:${k==='radar'?'#4a9eff':'#12123a'};
+             background:${k==='radar'?'#0a1a3a':'transparent'};
+             color:${k==='radar'?'#4a9eff':'#446'}">${l}</button>
+  `).join('');
+}
+
+window.onload = function(){
+  updateClock();
+  setInterval(updateClock, 10000);
+  buildDesktopNav();
+  updateNotifBadge();
+  startMonitor();
+  renderRadar();
+  // 초기 알림 요청 안내
+  setTimeout(()=>{
+    if('Notification' in window && Notification.permission==='default'){
+      pushNotif('👋 Influence Radar 시작','알림 ON 버튼을 눌러 24시간 모바일 알림을 활성화하세요');
+    }
+  },2000);
+};
+</script>
+</body>
+</html>
