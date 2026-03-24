@@ -973,9 +973,9 @@ function pushNotif(title, body, score=0, tickers=''){
   renderNotifPanel();
   if(score>=25) showSignalBanner(level,title,body,tickers);
   if(notifPermission&&(document.hidden||score>=45)){
-    new Notification(`${lv.emoji} ${lv.label} — ${title}`,{
-      body:tickers?`${body} | ${tickers}`:body,
-      tag:level,requireInteraction:level==='CRITICAL',
+    new Notification(`${lv.emoji} ${lv.label}`,{
+      body: tickers ? `${title} | 관련 종목: ${tickers}` : title,
+      tag:level, requireInteraction:level==='CRITICAL',
     });
   }
 }
@@ -1292,13 +1292,15 @@ async function processArticles(fig, articles, apiName) {
     count++;
 
     if(maxScore>=25 && notifPermission && !alert.isDemo) {
-      new Notification(`${SIGNAL_LEVELS[getSignalLevel(maxScore)].emoji} ${SIGNAL_LEVELS[getSignalLevel(maxScore)].label}`, {
-        body:`${art.title?.slice(0,60)} | ${topTickers||'시장 영향 감지'}`,
-        tag: getSignalLevel(maxScore),
+      const lvl = getSignalLevel(maxScore);
+      const lv = SIGNAL_LEVELS[lvl];
+      new Notification(`${lv.emoji} ${lv.label} — ${fig.name}`, {
+        body: `${art.title?.slice(0,50)||'새 뉴스'} ${topTickers?'| '+topTickers:''}`,
+        tag: lvl,
         requireInteraction: maxScore>=70,
       });
-      showSignalBanner(getSignalLevel(maxScore), art.title?.slice(0,50)||'', `${fig.name} · ${art.source?.name}`, topTickers);
-      if(navigator.vibrate) navigator.vibrate(SIGNAL_LEVELS[getSignalLevel(maxScore)].vibrate);
+      showSignalBanner(lvl, art.title?.slice(0,50)||'', `${fig.name} · ${art.source?.name||apiName}`, topTickers);
+      if(navigator.vibrate) navigator.vibrate(lv.vibrate);
     }
   }
   return count;
@@ -1330,7 +1332,7 @@ function startMonitor(){
   setInterval(()=>{
     const now=new Date();
     if(now.getHours()===9&&now.getMinutes()===0){
-      pushNotif('⚠ FOMC 시간','Jerome Powell 발언 가능 구간');
+      pushNotif('⚠ FOMC 시간', 'Jerome Powell 발언 가능 구간 — 금리 발언 주시', 45, 'JPM·BAC·GS');
     }
   },60000);
 }
