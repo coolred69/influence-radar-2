@@ -796,7 +796,26 @@ async function requestNotif(){
   if(!('Notification' in window)) return;
   const perm = await Notification.requestPermission();
   notifPermission = perm === 'granted';
+  // 허용 여부 영구 저장
+  localStorage.setItem('ir_notif_perm', perm);
   renderRadar();
+}
+
+// 시작 시 이전 허용 상태 자동 복원
+function initNotifPermission(){
+  if(!('Notification' in window)) return;
+  // 브라우저 실제 권한 상태 확인
+  if(Notification.permission === 'granted'){
+    notifPermission = true;
+    localStorage.setItem('ir_notif_perm', 'granted');
+  } else if(Notification.permission === 'denied'){
+    notifPermission = false;
+    localStorage.setItem('ir_notif_perm', 'denied');
+  } else {
+    // default — 이전에 허용했던 기록이 있으면 재요청 없이 복원
+    const saved = localStorage.getItem('ir_notif_perm');
+    notifPermission = saved === 'granted';
+  }
 }
 
 // ── 시그널 등급
@@ -1262,7 +1281,7 @@ function renderRadar(){
   document.getElementById('tab-radar').innerHTML = `
     <div class="sec">📡 영향력 레이더 — ${figs.length}명 감시 중 · 자동 점수 붕괴 적용</div>
 
-    ${!notifPermission?`
+    ${!notifPermission && Notification.permission!=='granted' ?`
     <div style="background:#120a00;border:1px solid #ff8c0044;border-radius:4px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
       <span style="font-size:11px;color:#ff8c00;font-family:sans-serif">📲 모바일 푸시 알림을 활성화하면 24시간 발언 감시가 가능합니다</span>
       <button class="btn btn-blue" style="padding:5px 12px;font-size:9px;white-space:nowrap" onclick="requestNotif()">알림 ON</button>
@@ -2514,13 +2533,16 @@ window.onload = function(){
   updateNotifBadge();
   startMonitor();
   renderRadar();
-  checkInstallPrompt(); // PWA 설치 안내
-  // 초기 알림 요청 안내
-  setTimeout(()=>{
-    if('Notification' in window && Notification.permission==='default'){
-      pushNotif('👋 Influence Radar 시작','알림 ON 버튼을 눌러 24시간 모바일 알림을 활성화하세요');
-    }
-  },2000);
+  checkInstallPrompt();
+  initNotifPermission(); // 알림 권한 복원
+  // 최초 1회만 알림 안내
+  const notifShown = localStorage.getItem('ir_notif_shown');
+  if(!notifShown && 'Notification' in window && Notification.permission==='default'){
+    localStorage.setItem('ir_notif_shown','1');
+    setTimeout(()=>{
+      pushNotif('👋 Influence Radar','알림 ON 버튼을 눌러 24시간 시그널 알림을 활성화하세요');
+    },2000);
+  }
 };
 </script>
 </body>
