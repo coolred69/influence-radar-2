@@ -2641,75 +2641,68 @@ function checkInstallPrompt() {
 window.onload = function(){
   // 저장된 GNews 키 로드
   const savedKey = localStorage.getItem('ir_gnews_key');
-  if(savedKey) {
-    // GNEWS_KEY 변수 업데이트 (런타임)
-    window._gnewsKey = savedKey;
-  }
+  if(savedKey) { window._gnewsKey = savedKey; }
+
   updateClock();
   setInterval(updateClock, 10000);
   buildDesktopNav();
   updateNotifBadge();
   startMonitor();
-  renderRadar();
+  
+  // [무결성 포인트 1] 접속 즉시 화면을 먼저 그립니다. (백지 방지)
+  renderRadar(); 
   checkInstallPrompt();
   initNotifPermission();
 
-  // Firebase 상태 표시
+  // Firebase 상태 표시 대기
   setTimeout(()=>{
     const fbSt = document.getElementById('fb-status');
-    if(fbSt) fbSt.textContent = window.fbReady ? '🔥 FB 연결됨' : '🔥 FB 오프라인';
-    if(fbSt && window.fbReady) fbSt.style.color = '#4ade80';
-    // FCM 자동 초기화 (알림 허용된 경우)
-    if(window.fbReady && window.fbInitFCM && notifPermission) {
-      window.fbInitFCM();
+    if(fbSt) {
+      fbSt.textContent = window.fbReady ? '🔥 FB 연결됨' : '🔥 FB 오프라인';
+      fbSt.style.color = window.fbReady ? '#4ade80' : '#f87171';
     }
   }, 3000);
 
-  // Firebase 데이터 로드 + 실시간 동기화
+  // [무결성 포인트 2] 비동기 데이터 로드 및 실시간 리스너 설정
   setTimeout(async () => {
     if(window.fbLoad) {
-      const fbData = await window.fbLoad();
-      if(fbData) {
-        // 로컬보다 Firebase 데이터가 더 최신이면 덮어씀
-        if(fbData.logs?.length > state.logs.length) {
-          state.logs = fbData.logs;
-          localStorage.setItem('ir_logs', JSON.stringify(state.logs));
-        }
-        if(fbData.alerts?.length > 0 && state.alerts.filter(a=>a.fromAPI).length === 0) {
-          state.alerts = fbData.alerts;
-          localStorage.setItem('ir_alerts', JSON.stringify(state.alerts));
-        }
-        if(fbData.learnData?.newsCount > learnData.newsCount) {
-          learnData = fbData.learnData;
-          localStorage.setItem('ir_learn', JSON.stringify(learnData));
-        }
-        renderRadar();
-        updateNotifBadge();
-        updateNewsStatus('ok');
-        console.log('✅ Firebase 데이터 로드 완료');
-      }
-
-// 실시간 동기화 — 다른 기기에서 변경 시 자동 반영
-      if(window.fbListen) {
-        window.fbListen((data) => {
-          if(data.logs?.length > state.logs.length) {
-            state.logs = data.logs;
+      try {
+        const fbData = await window.fbLoad();
+        if(fbData) {
+          if(fbData.logs?.length > state.logs.length) {
+            state.logs = fbData.logs;
             localStorage.setItem('ir_logs', JSON.stringify(state.logs));
-            if(state.currentTab==='log') renderLog();
           }
-          if(data.alerts?.length > state.alerts.length) {
-            state.alerts = data.alerts;
+          if(fbData.alerts?.length > 0) {
+            state.alerts = fbData.alerts;
             localStorage.setItem('ir_alerts', JSON.stringify(state.alerts));
-            updateNotifBadge();
-            if(state.currentTab==='news') renderNews();
           }
-        });
+          if(fbData.learnData?.newsCount > (learnData?.newsCount || 0)) {
+            learnData = fbData.learnData;
+            localStorage.setItem('ir_learn', JSON.stringify(learnData));
+          }
+          renderRadar(); // 데이터 업데이트 후 재렌더링
+          updateNotifBadge();
+          console.log('✅ Firebase 데이터 로드 완료');
+        }
+
+        // 실시간 동기화 활성화
+        if(window.fbListen) {
+          window.fbListen((data) => {
+            if(data.logs) state.logs = data.logs;
+            if(data.alerts) state.alerts = data.alerts;
+            renderRadar();
+            updateNotifBadge();
+          });
+        }
+      } catch (e) {
+        console.warn('FB Load/Listen 에러:', e);
       }
     }
   }, 2000);
-};
+}; // window.onload 종료
 
-// ── Service Worker 등록부 (최종 위치)
+// ── Service Worker 등록 (window.onload 외부 독립 실행으로 안정성 확보)
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('firebase-messaging-sw.js', { scope: './' })
     .then(reg => {
