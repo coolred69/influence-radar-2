@@ -2625,10 +2625,15 @@ window.onload = function(){
     navigator.serviceWorker.register('./firebase-messaging-sw.js')
       .then(reg => {
         console.log('✅ SW 등록:', reg.scope);
+        localStorage.setItem('ir_sw_ready','1');
         const fbSt = document.getElementById('fb-status');
         if(fbSt){ fbSt.textContent='🔥 FB+FCM 완료'; fbSt.style.color='#4ade80'; }
       })
-      .catch(err => console.warn('SW 실패:', err));
+      .catch(err => {
+        console.warn('SW 실패:', err);
+        const fbSt = document.getElementById('fb-status');
+        if(fbSt){ fbSt.textContent='🔥 FB 연결됨'; fbSt.style.color='#4ade80'; }
+      });
   }
 
   // FCM 자동 초기화 (알림 허용된 경우)
@@ -2651,13 +2656,11 @@ window.onload = function(){
   setTimeout(()=>{
     const fbSt = document.getElementById('fb-status');
     if(!fbSt) return;
-    const fcmDone = localStorage.getItem('ir_fcm_token');
-    if(window.fbReady && fcmDone) {
+    const swReady = localStorage.getItem('ir_sw_ready');
+    if(window.fbReady && swReady) {
       fbSt.textContent='🔥 FB+FCM 완료'; fbSt.style.color='#4ade80';
     } else if(window.fbReady) {
       fbSt.textContent='🔥 FB 연결됨'; fbSt.style.color='#4ade80';
-    } else {
-      fbSt.textContent='🔥 FB 오프라인'; fbSt.style.color='#f87171';
     }
   }, 3500);
 
