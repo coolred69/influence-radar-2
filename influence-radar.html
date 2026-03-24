@@ -1040,6 +1040,24 @@ const GNEWS_URL = 'https://gnews.io/api/v4/search';
 const CURRENTS_KEY = 'tWNp1egV25PGsljlScRHuk03eryF64K38n8GSBMhgh2cwzlD';
 const CURRENTS_URL = 'https://api.currentsapi.services/v1/search';
 
+// ── 구글 번역 (무료 비공식 API — 키 불필요)
+const translateCache = {};
+async function translateKO(text) {
+  if(!text) return text;
+  if(translateCache[text]) return translateCache[text];
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    if(!res.ok) return text;
+    const data = await res.json();
+    const translated = data?.[0]?.map(x=>x?.[0]||'').join('') || text;
+    translateCache[text] = translated;
+    return translated;
+  } catch(e) {
+    return text; // 실패 시 원문 반환
+  }
+}
+
 // 인물별 검색 키워드
 const FIG_KEYWORDS = {
   1: ['Trump tariff','Trump stock','Trump trade','Trump crypto','Trump economy','Trump policy'],
@@ -1273,13 +1291,20 @@ async function processArticles(fig, articles, apiName) {
     const topTickers = oppScores.filter(x=>x.score>=45).map(x=>x.ticker).slice(0,3).join('·');
     const maxScore = oppScores[0]?.score||0;
 
+    // 한국어 번역
+    const titleKO = await translateKO(art.title||'');
+    const descKO = await translateKO((art.description||'').slice(0,100));
+
     learnFromNews(fig.id, art, sentiment, affectedSectors);
 
     const alert = {
       id: Date.now()+Math.random(),
       figureId: fig.id, figureName: fig.name,
       figureColor: fig.color, figureAvatar: fig.avatar,
-      title: art.title, source: `${art.source?.name||apiName}`,
+      title: titleKO,
+      titleOrig: art.title,
+      desc: descKO,
+      source: `${art.source?.name||apiName}`,
       url: art.url, publishedAt: art.publishedAt,
       sectors: affectedSectors, topTickers, maxScore, sentiment,
       sentimentLabel: sentiment<-1?'🔴 부정':sentiment>1?'🟢 긍정':'🟡 중립',
@@ -1294,18 +1319,18 @@ async function processArticles(fig, articles, apiName) {
     if(maxScore>=25 && notifPermission && !alert.isDemo) {
       const lvl = getSignalLevel(maxScore);
       const lv = SIGNAL_LEVELS[lvl];
-      new Notification(`${lv.emoji} ${lv.label} — ${fig.name}`, {
-        body: `${art.title?.slice(0,50)||'새 뉴스'} ${topTickers?'| '+topTickers:''}`,
-        tag: lvl,
-        requireInteraction: maxScore>=70,
+      new Notification(`${lv.emoji} ${lv.label}`,{
+        body: topTickers
+          ? `${titleKO.slice(0,50)} | 관련 종목: ${topTickers}`
+          : titleKO.slice(0,80),
+        tag: lvl, requireInteraction: maxScore>=70,
       });
-      showSignalBanner(lvl, art.title?.slice(0,50)||'', `${fig.name} · ${art.source?.name||apiName}`, topTickers);
+      showSignalBanner(lvl, titleKO.slice(0,50), `${fig.name} · ${art.source?.name||apiName}`, topTickers);
       if(navigator.vibrate) navigator.vibrate(lv.vibrate);
     }
   }
   return count;
 }
-
 function updateNewsStatus(status){
   const dot=document.getElementById('news-status-dot');
   const txt=document.getElementById('news-status-txt');
