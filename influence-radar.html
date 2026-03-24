@@ -2631,6 +2631,13 @@ window.onload = function(){
       .catch(err => console.warn('SW 실패:', err));
   }
 
+  // FCM 자동 초기화 (알림 허용된 경우)
+  setTimeout(()=>{
+    if(window.fbReady && window.fbInitFCM && notifPermission) {
+      window.fbInitFCM();
+    }
+  }, 4000);
+
   updateClock();
   setInterval(updateClock, 10000);
   buildDesktopNav();
@@ -2643,13 +2650,16 @@ window.onload = function(){
   // Firebase 상태 표시
   setTimeout(()=>{
     const fbSt = document.getElementById('fb-status');
-    if(fbSt) fbSt.textContent = window.fbReady ? '🔥 FB 연결됨' : '🔥 FB 오프라인';
-    if(fbSt && window.fbReady) fbSt.style.color = '#4ade80';
-    // FCM 자동 초기화 (알림 허용된 경우)
-    if(window.fbReady && window.fbInitFCM && notifPermission) {
-      window.fbInitFCM();
+    if(!fbSt) return;
+    const fcmDone = localStorage.getItem('ir_fcm_token');
+    if(window.fbReady && fcmDone) {
+      fbSt.textContent='🔥 FB+FCM 완료'; fbSt.style.color='#4ade80';
+    } else if(window.fbReady) {
+      fbSt.textContent='🔥 FB 연결됨'; fbSt.style.color='#4ade80';
+    } else {
+      fbSt.textContent='🔥 FB 오프라인'; fbSt.style.color='#f87171';
     }
-  }, 3000);
+  }, 3500);
 
   // Firebase 데이터 로드 + 실시간 동기화
   setTimeout(async () => {
