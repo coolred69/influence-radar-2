@@ -234,19 +234,6 @@ window.fbInitFCM = async function() {
 window.db = db;
 window.fbReady = true;
 console.log('✅ Firebase 연결 완료');
-
-// ── Service Worker 등록 (FCM 백그라운드 알림)
-if('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./firebase-messaging-sw.js')
-    .then(reg => {
-      console.log('✅ FCM Service Worker 등록 완료:', reg.scope);
-      const fbSt = document.getElementById('fb-status');
-      if(fbSt) { fbSt.textContent='🔥 FB+FCM 완료'; fbSt.style.color='#4ade80'; }
-    })
-    .catch(err => {
-      console.warn('SW 등록 실패:', err);
-    });
-}
 </script>
 <body>
 
@@ -2633,6 +2620,17 @@ window.onload = function(){
     // GNEWS_KEY 변수 업데이트 (런타임)
     window._gnewsKey = savedKey;
   }
+  // Service Worker 등록 (FCM 백그라운드 알림)
+  if('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./firebase-messaging-sw.js')
+      .then(reg => {
+        console.log('✅ SW 등록:', reg.scope);
+        const fbSt = document.getElementById('fb-status');
+        if(fbSt){ fbSt.textContent='🔥 FB+FCM 완료'; fbSt.style.color='#4ade80'; }
+      })
+      .catch(err => console.warn('SW 실패:', err));
+  }
+
   updateClock();
   setInterval(updateClock, 10000);
   buildDesktopNav();
