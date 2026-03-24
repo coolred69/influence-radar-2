@@ -7,7 +7,40 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Influence Radar">
 <meta name="theme-color" content="#04040f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="Influence Radar">
 <title>Influence Radar</title>
+
+<!-- PWA 매니페스트 (인라인) -->
+<script>
+const MANIFEST = {
+  name: "Influence Radar",
+  short_name: "I-Radar",
+  description: "영향력자 발언 감시 · 주식 시그널 탐지",
+  start_url: "./",
+  display: "standalone",
+  background_color: "#04040f",
+  theme_color: "#04040f",
+  orientation: "portrait-primary",
+  icons: [
+    { src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%2304040f'/><circle cx='96' cy='96' r='40' fill='none' stroke='%23ff4444' stroke-width='8'/><circle cx='96' cy='96' r='20' fill='none' stroke='%23ff8c00' stroke-width='5'/><circle cx='96' cy='96' r='6' fill='%23ff4444'/><line x1='96' y1='10' x2='96' y2='36' stroke='%23ff4444' stroke-width='4'/><line x1='96' y1='156' x2='96' y2='182' stroke='%23ff4444' stroke-width='4'/><line x1='10' y1='96' x2='36' y2='96' stroke='%23ff4444' stroke-width='4'/><line x1='156' y1='96' x2='182' y2='96' stroke='%23ff4444' stroke-width='4'/></svg>`),
+      sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
+    { src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%2304040f'/><circle cx='256' cy='256' r='110' fill='none' stroke='%23ff4444' stroke-width='18'/><circle cx='256' cy='256' r='55' fill='none' stroke='%23ff8c00' stroke-width='12'/><circle cx='256' cy='256' r='16' fill='%23ff4444'/><line x1='256' y1='30' x2='256' y2='96' stroke='%23ff4444' stroke-width='10'/><line x1='256' y1='416' x2='256' y2='482' stroke='%23ff4444' stroke-width='10'/><line x1='30' y1='256' x2='96' y2='256' stroke='%23ff4444' stroke-width='10'/><line x1='416' y1='256' x2='482' y2='256' stroke='%23ff4444' stroke-width='10'/></svg>`),
+      sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" },
+  ],
+};
+// 매니페스트 동적 주입
+const blob = new Blob([JSON.stringify(MANIFEST)], {type:'application/json'});
+const manifestURL = URL.createObjectURL(blob);
+document.addEventListener('DOMContentLoaded', () => {
+  const link = document.createElement('link');
+  link.rel = 'manifest'; link.href = manifestURL;
+  document.head.appendChild(link);
+});
+</script>
+
+<!-- Apple 홈화면 아이콘 -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%2304040f'/%3E%3Ccircle cx='90' cy='90' r='38' fill='none' stroke='%23ff4444' stroke-width='7'/%3E%3Ccircle cx='90' cy='90' r='19' fill='none' stroke='%23ff8c00' stroke-width='5'/%3E%3Ccircle cx='90' cy='90' r='6' fill='%23ff4444'/%3E%3Cline x1='90' y1='10' x2='90' y2='33' stroke='%23ff4444' stroke-width='4'/%3E%3Cline x1='90' y1='147' x2='90' y2='170' stroke='%23ff4444' stroke-width='4'/%3E%3Cline x1='10' y1='90' x2='33' y2='90' stroke='%23ff4444' stroke-width='4'/%3E%3Cline x1='147' y1='90' x2='170' y2='90' stroke='%23ff4444' stroke-width='4'/%3E%3C/svg%3E">
 <style>
 :root{
   --bg:#04040f;--panel:#07071a;--border:#12123a;--text:#d0d0ee;--dim:#889;
@@ -26,6 +59,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);
 .live-dot{width:9px;height:9px;border-radius:50%;background:var(--red);
   box-shadow:0 0 8px var(--red);animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes slideDown{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes installPulse{0%,100%{box-shadow:0 0 0 0 #4a9eff44}50%{box-shadow:0 0 0 8px #4a9eff00}}
 .header-title{font-size:12px;letter-spacing:3px;color:#aabbdd;text-transform:uppercase;font-weight:600}
 .header-time{font-size:11px;color:#4a9eff;font-weight:600}
 /* ── TAB NAV (상단 스크롤형) */
@@ -124,7 +159,13 @@ label{font-size:11px;color:#99aacc;display:block;margin-bottom:4px;
     <div class="live-dot" id="live-dot"></div>
     <span class="header-title">Influence Radar</span>
   </div>
-  <div style="display:flex;align-items:center;gap:12px">
+  <div style="display:flex;align-items:center;gap:10px">
+    <button id="install-btn" onclick="installApp()" style="display:none;
+      font-size:10px;padding:5px 11px;border-radius:3px;cursor:pointer;
+      border:1px solid #4a9eff;background:#0a1a3a;color:#4a9eff;
+      font-family:var(--mono);align-items:center;gap:5px;white-space:nowrap">
+      📲 홈화면 추가
+    </button>
     <div style="position:relative;cursor:pointer" onclick="toggleNotif()">
       <svg width="20" height="20" fill="none" stroke="#aab" stroke-width="1.5" viewBox="0 0 24 24">
         <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
@@ -758,22 +799,78 @@ async function requestNotif(){
   renderRadar();
 }
 
-function pushNotif(title, body, urgent){
-  const alert = {id:Date.now(), title, body, time:new Date().toLocaleTimeString('ko-KR',{hour12:false}), read:false};
-  state.alerts.unshift(alert);
-  if(state.alerts.length>50) state.alerts=state.alerts.slice(0,50);
+// ── 시그널 등급
+const SIGNAL_LEVELS = {
+  CRITICAL:{emoji:'🔴',label:'즉시포착',color:'#ff4444',bg:'#1a0505',border:'#ff444466',vibrate:[200,100,200,100,200]},
+  HIGH:    {emoji:'🟠',label:'유망 시그널',color:'#ff8c00',bg:'#140a00',border:'#ff8c0044',vibrate:[200,100,200]},
+  MEDIUM:  {emoji:'🟡',label:'관찰',color:'#fbbf24',bg:'#0f0e00',border:'#fbbf2433',vibrate:[100]},
+  INFO:    {emoji:'📡',label:'뉴스',color:'#4a9eff',bg:'#04040f',border:'#4a9eff22',vibrate:[50]},
+};
+function getSignalLevel(s){return s>=70?'CRITICAL':s>=45?'HIGH':s>=25?'MEDIUM':'INFO';}
+
+// ── 인앱 배너 큐
+let signalQueue=[], signalShowing=false;
+function showSignalBanner(level,title,body,tickers){
+  signalQueue.push({level,lv:SIGNAL_LEVELS[level],title,body,tickers});
+  if(!signalShowing) processSignalQueue();
+}
+function processSignalQueue(){
+  if(!signalQueue.length){signalShowing=false;return;}
+  signalShowing=true;
+  const sig=signalQueue.shift();
+  const lv=sig.lv;
+  document.getElementById('signal-banner')?.remove();
+  const banner=document.createElement('div');
+  banner.id='signal-banner';
+  banner.style.cssText=`position:fixed;top:140px;left:10px;right:10px;z-index:999;
+    background:${lv.bg};border:2px solid ${lv.border};border-left:5px solid ${lv.color};
+    border-radius:6px;padding:12px 14px;box-shadow:0 4px 24px ${lv.color}55;`;
+  banner.innerHTML=`
+    <div style="display:flex;align-items:flex-start;gap:10px">
+      <span style="font-size:22px;flex-shrink:0">${lv.emoji}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+          <span style="font-size:12px;font-weight:bold;color:${lv.color};font-family:var(--mono)">${lv.label}</span>
+          ${sig.tickers?sig.tickers.split('·').map(t=>`<span style="font-size:11px;padding:2px 8px;
+            background:#0a1a3a;border:1px solid #4a9eff55;color:#4a9eff;
+            border-radius:3px;font-family:var(--mono);font-weight:bold">${t}</span>`).join(''):''}
+        </div>
+        <div style="font-size:12px;color:#eeeeff;font-family:sans-serif;line-height:1.5;margin-bottom:4px">${sig.title}</div>
+        <div style="font-size:10px;color:#889;font-family:sans-serif">${sig.body}</div>
+      </div>
+      <button onclick="document.getElementById('signal-banner').remove();processSignalQueue()"
+        style="background:none;border:none;color:#666;cursor:pointer;font-size:18px;padding:0">✕</button>
+    </div>`;
+  document.body.appendChild(banner);
+  if(navigator.vibrate&&lv.vibrate) navigator.vibrate(lv.vibrate);
+  const ms=sig.level==='CRITICAL'?8000:sig.level==='HIGH'?5000:3000;
+  setTimeout(()=>{banner.style.opacity='0';banner.style.transition='opacity .3s';
+    setTimeout(()=>{banner.remove();processSignalQueue();},300);},ms);
+}
+
+function pushNotif(title, body, score=0, tickers=''){
+  const level = score>0?getSignalLevel(score):'INFO';
+  const lv = SIGNAL_LEVELS[level];
+  const alertItem={id:Date.now(),title,body,level,score,tickers,
+    color:lv.color,emoji:lv.emoji,label:lv.label,
+    time:new Date().toLocaleTimeString('ko-KR',{hour12:false}),read:false};
+  state.alerts.unshift(alertItem);
+  if(state.alerts.length>100) state.alerts=state.alerts.slice(0,100);
   save();
   updateNotifBadge();
   renderNotifPanel();
-
-  if(notifPermission && document.hidden){
-    new Notification('📡 ' + title, {body, icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="%23ff4444"/><text y=".9em" font-size="90" x="10">📡</text></svg>'});
+  if(score>=25) showSignalBanner(level,title,body,tickers);
+  if(notifPermission&&(document.hidden||score>=45)){
+    new Notification(`${lv.emoji} ${lv.label} — ${title}`,{
+      body:tickers?`${body} | ${tickers}`:body,
+      tag:level,requireInteraction:level==='CRITICAL',
+    });
   }
 }
 
 function updateNotifBadge(){
-  const unread = state.alerts.filter(a=>!a.read).length;
-  const badge = document.getElementById('notif-count');
+  const unread=state.alerts.filter(a=>!a.read).length;
+  const badge=document.getElementById('notif-count');
   if(unread>0){badge.style.display='flex';badge.textContent=unread>9?'9+':unread;}
   else badge.style.display='none';
 }
@@ -794,15 +891,28 @@ function renderNotifPanel(){
     panel.innerHTML=`<div style="padding:14px 16px;background:#07071a;border-bottom:1px solid #12123a;font-size:11px;color:#446">알림 없음</div>`;
     return;
   }
-  panel.innerHTML = state.alerts.slice(0,10).map(a=>`
-    <div class="notif-item">
-      <div style="color:#ff8c00;font-size:16px">📡</div>
-      <div>
-        <div style="color:#eeeeff;font-size:11px;font-family:sans-serif">${a.title}</div>
-        <div style="color:#889;font-size:10px;margin-top:2px;font-family:sans-serif">${a.body}</div>
-        <div style="color:#446;font-size:9px;margin-top:2px">${a.time}</div>
+  panel.innerHTML = state.alerts.slice(0,15).map(a=>{
+    const lv = SIGNAL_LEVELS[a.level||'INFO'];
+    return `
+    <div style="padding:10px 14px;background:${lv.bg};border-bottom:1px solid ${lv.border};
+      border-left:3px solid ${lv.color};display:flex;gap:10px;align-items:flex-start">
+      <span style="font-size:16px;flex-shrink:0">${lv.emoji}</span>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
+          <span style="font-size:10px;font-weight:bold;color:${lv.color}">${lv.label}</span>
+          ${a.tickers?a.tickers.split('·').map(t=>`
+            <span style="font-size:9px;padding:1px 6px;background:#0a1a3a;
+              border:1px solid #4a9eff44;color:#4a9eff;border-radius:2px;
+              font-family:var(--mono)">${t}</span>`).join(''):''}
+          ${a.score>0?`<span style="font-size:10px;font-weight:bold;color:${lv.color};
+            font-family:var(--mono);margin-left:auto">${a.score}점</span>`:''}
+        </div>
+        <div style="color:#eeeeff;font-size:11px;font-family:sans-serif;line-height:1.4">${a.title}</div>
+        ${a.body?`<div style="color:#889;font-size:10px;margin-top:2px;font-family:sans-serif">${a.body}</div>`:''}
+        <div style="color:#446;font-size:9px;margin-top:3px">${a.time}</div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // 24시간 모니터링 시뮬레이션 (30초마다 체크)
@@ -810,161 +920,307 @@ let monitorInterval;
 // ═══════════════════════════════════════
 // NEWS API 연동
 // ═══════════════════════════════════════
-const NEWS_API_KEY = 'aa77d6160bfe48c686838c4dececc003';
-const NEWS_API_URL = 'https://newsapi.org/v2/everything';
+// ═══════════════════════════════════════
+// GNEWS API + 누적 학습 시스템
+// ═══════════════════════════════════════
+const GNEWS_KEY = 'd02a2d820d99df4f5c981a365a118eef';
+const GNEWS_URL = 'https://gnews.io/api/v4/search';
+const CURRENTS_KEY = 'tWNp1egV25PGsljlScRHuk03eryF64K38n8GSBMhgh2cwzlD';
+const CURRENTS_URL = 'https://api.currentsapi.services/v1/search';
 
 // 인물별 검색 키워드
 const FIG_KEYWORDS = {
-  1: ['Trump tariff','Trump stock market','Trump trade','Trump crypto','Trump economy'],
-  2: ['Elon Musk Tesla','Elon Musk xAI','Elon Musk tweet','Musk DOGE','Musk stock'],
-  3: ['Jerome Powell Fed','Federal Reserve rate','FOMC statement','Powell interest'],
-  4: ['Xi Jinping economy','China semiconductor','China tech crackdown','Beijing policy'],
-  5: ['Jensen Huang Nvidia','NVDA earnings','Nvidia AI','Jensen Huang GTC'],
+  1: ['Trump tariff','Trump stock','Trump trade','Trump crypto','Trump economy','Trump policy'],
+  2: ['Elon Musk Tesla','Musk xAI','Musk tweet','Musk DOGE','Musk stock','Tesla shares'],
+  3: ['Jerome Powell Fed','Federal Reserve rate','FOMC','Powell interest rate'],
+  4: ['Xi Jinping economy','China semiconductor','China tech','Beijing policy','China trade'],
+  5: ['Jensen Huang Nvidia','NVDA earnings','Nvidia AI','Nvidia GPU','Nvidia chip'],
   6: ['Warren Buffett Berkshire','Buffett sell','Buffett buy','Berkshire portfolio'],
-  7: ['Jamie Dimon JPMorgan','Dimon economy','JPMorgan outlook'],
-  8: ['Sam Altman OpenAI','ChatGPT regulation','OpenAI funding'],
-  9: ['OPEC oil price','Saudi Arabia MBS','oil supply cut'],
+  7: ['Jamie Dimon JPMorgan','Dimon economy','JPMorgan forecast'],
+  8: ['Sam Altman OpenAI','ChatGPT regulation','OpenAI funding','AI regulation'],
+  9: ['OPEC oil price','Saudi Arabia oil','oil supply','Brent crude'],
 };
 
-// 섹터 키워드 매핑
 const SECTOR_KEYWORDS = {
-  AI:['artificial intelligence crash','AI bubble','AI regulation','AI stock'],
-  SEMICON:['semiconductor ban','chip export','TSMC Taiwan','ASML restriction'],
-  EV:['electric vehicle subsidy','EV tax credit','Tesla recall','BYD competition'],
-  CRYPTO:['Bitcoin crash','crypto regulation','SEC crypto','crypto ban'],
-  ENERGY:['oil price surge','Iran war oil','OPEC cut','energy crisis'],
-  TRADE:['tariff','trade war','import duty','sanctions'],
+  AI:['artificial intelligence','AI bubble','AI regulation','AI stock','deep learning','ChatGPT','OpenAI'],
+  SEMICON:['semiconductor','chip export','TSMC','ASML','chip ban','wafer','foundry'],
+  EV:['electric vehicle','EV subsidy','Tesla recall','BYD','EV tax credit','battery'],
+  CRYPTO:['Bitcoin','crypto','blockchain','SEC crypto','digital asset','Ethereum','DOGE'],
+  ENERGY:['oil price','Iran war','OPEC','crude oil','energy crisis','natural gas','petroleum'],
+  TRADE:['tariff','trade war','import duty','sanctions','trade deal','export ban'],
+  FINANCE:['interest rate','Fed rate','bank earnings','financial crisis','yield curve'],
+  DEFENSE:['defense spending','military','NATO','war','geopolitical','missile'],
 };
+
+// 부정/긍정 키워드
+const NEG_WORDS = ['crash','drop','fall','decline','ban','restrict','warn','crisis','collapse','plunge','sink','fear','risk','threat','concern','slump'];
+const POS_WORDS = ['surge','rise','gain','rally','growth','record','beat','exceed','strong','buy','invest','boom','profit','bullish'];
 
 let lastNewsCheck = 0;
 let newsCheckInterval = null;
-let latestNews = [];
 
-async function fetchNews(query) {
+// ── 누적 학습 데이터 (localStorage 영구 저장)
+let learnData = JSON.parse(localStorage.getItem('ir_learn') || JSON.stringify({
+  figStats: {}, // 인물별 누적 통계
+  sectorStats: {}, // 섹터별 누적 통계
+  newsCount: 0, // 총 수집 뉴스 수
+  lastUpdated: null,
+  patternAdjust: {}, // 자동 점수 보정값
+}));
+
+function saveLearn(){ localStorage.setItem('ir_learn', JSON.stringify(learnData)); }
+
+// ── 학습 엔진 — 뉴스 분석 후 패턴 점수 자동 보정
+function learnFromNews(figId, article, sentimentScore, sectors){
+  if(!learnData.figStats[figId]) learnData.figStats[figId] = {
+    totalNews:0, negCount:0, posCount:0, sectorHits:{}, avgSentiment:0, lastSeen:null
+  };
+  const fs = learnData.figStats[figId];
+  fs.totalNews++;
+  fs.lastSeen = new Date().toISOString();
+  if(sentimentScore < 0) fs.negCount++;
+  else if(sentimentScore > 0) fs.posCount++;
+  fs.avgSentiment = ((fs.avgSentiment * (fs.totalNews-1)) + sentimentScore) / fs.totalNews;
+
+  sectors.forEach(sec=>{
+    fs.sectorHits[sec] = (fs.sectorHits[sec]||0)+1;
+  });
+
+  // 섹터 통계
+  sectors.forEach(sec=>{
+    if(!learnData.sectorStats[sec]) learnData.sectorStats[sec]={hits:0,negHits:0};
+    learnData.sectorStats[sec].hits++;
+    if(sentimentScore<0) learnData.sectorStats[sec].negHits++;
+  });
+
+  learnData.newsCount++;
+  learnData.lastUpdated = new Date().toISOString();
+
+  // 자동 점수 보정 — 부정 뉴스 많을수록 영향력 점수 +, 조작 의심도 반영
+  const negRatio = fs.negCount / Math.max(fs.totalNews,1);
+  const bonus = Math.min(5, Math.round(negRatio * 10)); // 최대 +5점 보정
+  learnData.patternAdjust[figId] = bonus;
+
+  // 영향력 점수 실시간 반영
+  const fig = state.figs.find(f=>f.id===figId);
+  if(fig) {
+    fig.inf = Math.min(100, fig.base + bonus + (PATTERNS[figId]?.patternBonus||0));
+  }
+
+  saveLearn();
+}
+
+// ── 감성 분석 (간단 규칙 기반)
+function analyzeSentiment(text){
+  const t = text.toLowerCase();
+  let score = 0;
+  NEG_WORDS.forEach(w=>{ if(t.includes(w)) score -= 1; });
+  POS_WORDS.forEach(w=>{ if(t.includes(w)) score += 1; });
+  return score;
+}
+
+// ── GNews API 호출
+// ── Currents API (실시간, CORS 허용, 20건/일)
+async function fetchCurrents(query) {
   try {
-    const from = new Date(Date.now() - 6*60*60*1000).toISOString(); // 최근 6시간
-    const url = `${NEWS_API_URL}?q=${encodeURIComponent(query)}&from=${from}&sortBy=publishedAt&language=en&pageSize=5&apiKey=${NEWS_API_KEY}`;
+    const url = `${CURRENTS_URL}?keywords=${encodeURIComponent(query)}&language=en&apiKey=${CURRENTS_KEY}`;
     const res = await fetch(url);
     if(!res.ok) return [];
     const data = await res.json();
-    return data.articles || [];
-  } catch(e) {
-    return [];
+    return (data.news||[]).map(a=>({
+      title: a.title,
+      description: a.description,
+      url: a.url,
+      publishedAt: a.published,
+      source: {name: a.author||'Currents'},
+      apiSource: 'Currents',
+    }));
+  } catch(e) { return []; }
+}
+
+// ── GNews API (12시간 지연, CORS 차단 → 프록시 우회 시도)
+async function fetchGNewsAPI(query) {
+  try {
+    // CORS 우회: allorigins 프록시 사용
+    const target = `${GNEWS_URL}?q=${encodeURIComponent(query)}&lang=en&max=5&apikey=${GNEWS_KEY}`;
+    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`;
+    const res = await fetch(proxy);
+    if(!res.ok) return [];
+    const data = await res.json();
+    return (data.articles||[]).map(a=>({
+      title: a.title,
+      description: a.description,
+      url: a.url,
+      publishedAt: a.publishedAt,
+      source: {name: a.source?.name||'GNews'},
+      apiSource: 'GNews',
+    }));
+  } catch(e) { return []; }
+}
+
+// ── 통합 뉴스 수집 (중복 URL 제거)
+async function fetchAllNews(query) {
+  const [currents, gnews] = await Promise.all([
+    fetchCurrents(query),
+    fetchGNewsAPI(query),
+  ]);
+  // 중복 URL 제거
+  const seen = new Set();
+  const merged = [];
+  for(const art of [...currents, ...gnews]) {
+    const key = art.url || art.title;
+    if(!seen.has(key)) { seen.add(key); merged.push(art); }
   }
+  return merged;
+}
+
+// ── 키 없을 때 데모 뉴스
+async function fetchGNews(query) {
+  return fetchAllNews(query);
+}
+
+// ── 키 없을 때 샘플 뉴스 (데모용)
+function fetchMockNews(query){
+  const mocks = [
+    {title:`Trump signals new tariff expansion on tech imports`,description:`President Trump indicated further tariff measures could target semiconductor and AI hardware imports, rattling markets`,url:'#',publishedAt:new Date().toISOString(),source:{name:'Reuters (Demo)'}},
+    {title:`Elon Musk tweets support for AI deregulation, Tesla shares jump`,description:`Musk's latest post on X called for removing AI development restrictions, sending Tesla and Nvidia stocks higher in premarket`,url:'#',publishedAt:new Date().toISOString(),source:{name:'Bloomberg (Demo)'}},
+    {title:`Fed's Powell warns equity valuations remain historically elevated`,description:`Federal Reserve chairman Jerome Powell reiterated concerns about stretched stock valuations during congressional testimony`,url:'#',publishedAt:new Date().toISOString(),source:{name:'WSJ (Demo)'}},
+    {title:`Nvidia GTC keynote: Jensen Huang unveils next-gen Blackwell Ultra chip`,description:`CEO Jensen Huang announced massive compute upgrades sending semiconductor stocks surging across the board`,url:'#',publishedAt:new Date().toISOString(),source:{name:'CNBC (Demo)'}},
+    {title:`China threatens semiconductor export controls in trade dispute escalation`,description:`Beijing officials warned of potential restrictions on rare earth exports and chip manufacturing equipment`,url:'#',publishedAt:new Date().toISOString(),source:{name:'FT (Demo)'}},
+  ];
+  const q = query.toLowerCase();
+  const relevant = mocks.filter(m=>
+    m.title.toLowerCase().split(' ').some(w=>q.includes(w))
+  );
+  return relevant.length ? relevant.slice(0,2) : mocks.slice(0,1);
 }
 
 async function runNewsCheck() {
   const now = Date.now();
-  // 30분마다 체크
-  if(now - lastNewsCheck < 30*60*1000) return;
+  // Currents 20건/일 기준 — 1시간마다 체크
+  if(now - lastNewsCheck < 60*60*1000) return;
   lastNewsCheck = now;
-
   updateNewsStatus('checking');
 
-  const figs = getSortedFigs().filter(f=>f.inf>=70);
-  let newAlerts = 0;
+  // 인물 분배 전략:
+  // Currents (실시간) → 상위 2명 (Trump·Musk)
+  // GNews (12시간 지연) → 나머지 인물 (프록시 경유)
+  const allFigs = getSortedFigs().filter(f=>f.inf>=65);
+  const currFigs = allFigs.slice(0,2);  // Currents 담당
+  const gnewsFigs = allFigs.slice(2,6); // GNews 담당
+  let newCount = 0;
 
-  for(const fig of figs.slice(0,4)) { // API 절약 — 상위 4명만
-    const keywords = FIG_KEYWORDS[fig.id];
-    if(!keywords) continue;
-
-    const query = keywords[Math.floor(Math.random()*keywords.length)];
-    const articles = await fetchNews(query);
-
-    for(const art of articles.slice(0,2)) {
-      const isNew = !state.alerts.find(a=>a.url===art.url);
-      if(!isNew) continue;
-
-      // 영향 섹터 자동 감지
-      const title = (art.title||'').toLowerCase();
-      const desc = (art.description||'').toLowerCase();
-      const combined = title+' '+desc;
-
-      const affectedSectors = Object.entries(SECTOR_KEYWORDS)
-        .filter(([sec,kws])=>kws.some(kw=>combined.includes(kw.toLowerCase())))
-        .map(([sec])=>sec);
-
-      // 기회점수 계산 (평균 -10% 가정)
-      const oppScores = affectedSectors.flatMap(sec=>{
-        const sd = SM[sec]; if(!sd) return [];
-        return sd.d.map(s=>({ticker:s.t,score:opp(fig.inf,s.f,10)}));
-      }).sort((a,b)=>b.score-a.score).slice(0,3);
-
-      const topTickers = oppScores.filter(x=>x.score>=45).map(x=>x.ticker).join('·');
-      const maxScore = oppScores[0]?.score||0;
-
-      const alert = {
-        id: Date.now()+Math.random(),
-        figureId: fig.id,
-        figureName: fig.name,
-        figureColor: fig.color,
-        figureAvatar: fig.avatar,
-        title: art.title,
-        source: art.source?.name||'News',
-        url: art.url,
-        publishedAt: art.publishedAt,
-        sectors: affectedSectors,
-        topTickers,
-        maxScore,
-        time: new Date(art.publishedAt).toLocaleTimeString('ko-KR',{hour12:false,hour:'2-digit',minute:'2-digit'}),
-        read: false,
-        fromAPI: true,
-      };
-
-      state.alerts.unshift(alert);
-      newAlerts++;
-
-      // 고점수 알림은 푸시
-      if(maxScore>=45 && notifPermission) {
-        new Notification(`📡 ${fig.name} 관련 뉴스`, {
-          body: `${art.title?.slice(0,60)}... | ${topTickers||affectedSectors[0]||''}`,
-        });
-      }
-    }
+  // ① Currents — 상위 2명 실시간 수집
+  for(const fig of currFigs) {
+    const keywords = FIG_KEYWORDS[fig.id]; if(!keywords) continue;
+    const checkCount = learnData.figStats[fig.id]?.totalNews||0;
+    const query = keywords[checkCount % keywords.length];
+    const articles = await fetchCurrents(query);
+    newCount += await processArticles(fig, articles, 'Currents');
   }
 
-  if(state.alerts.length>100) state.alerts=state.alerts.slice(0,100);
+  // ② GNews 프록시 — 나머지 인물 (지연 있지만 커버리지 확대)
+  for(const fig of gnewsFigs) {
+    const keywords = FIG_KEYWORDS[fig.id]; if(!keywords) continue;
+    const checkCount = learnData.figStats[fig.id]?.totalNews||0;
+    const query = keywords[checkCount % keywords.length];
+    const articles = await fetchGNewsAPI(query);
+    newCount += await processArticles(fig, articles, 'GNews');
+  }
+
+  if(state.alerts.length>300) state.alerts=state.alerts.slice(0,300);
   save();
   updateNotifBadge();
-  updateNewsStatus(newAlerts>0?'new':'ok');
-
-  // 현재 레이더 탭이면 다시 렌더
-  if(state.currentTab==='radar') renderRadarNewsBar();
+  updateNewsStatus(newCount>0?'new':'ok');
   if(state.currentTab==='news') renderNews();
+  if(state.currentTab==='radar') renderRadar();
+}
+
+// ── 기사 처리 공통 함수
+async function processArticles(fig, articles, apiName) {
+  let count = 0;
+  for(const art of articles.slice(0,2)) {
+    const key = art.url&&art.url!=='#' ? art.url : art.title;
+    const isNew = !state.alerts.find(a=>(a.url===art.url||a.title===art.title)&&a.url!=='#');
+    if(!isNew && art.url!=='#') continue;
+
+    const combined = (art.title||'')+' '+(art.description||'');
+    const sentiment = analyzeSentiment(combined);
+    const combined_low = combined.toLowerCase();
+
+    const affectedSectors = Object.entries(SECTOR_KEYWORDS)
+      .filter(([,kws])=>kws.some(kw=>combined_low.includes(kw.toLowerCase())))
+      .map(([sec])=>sec);
+
+    const estDrop = sentiment<0 ? 12 : 5;
+    const oppScores = affectedSectors.flatMap(sec=>{
+      const sd=SM[sec]; if(!sd) return [];
+      return sd.d.map(s=>({ticker:s.t,score:opp(fig.inf,s.f,estDrop)}));
+    }).sort((a,b)=>b.score-a.score);
+
+    const topTickers = oppScores.filter(x=>x.score>=45).map(x=>x.ticker).slice(0,3).join('·');
+    const maxScore = oppScores[0]?.score||0;
+
+    learnFromNews(fig.id, art, sentiment, affectedSectors);
+
+    const alert = {
+      id: Date.now()+Math.random(),
+      figureId: fig.id, figureName: fig.name,
+      figureColor: fig.color, figureAvatar: fig.avatar,
+      title: art.title, source: `${art.source?.name||apiName}`,
+      url: art.url, publishedAt: art.publishedAt,
+      sectors: affectedSectors, topTickers, maxScore, sentiment,
+      sentimentLabel: sentiment<-1?'🔴 부정':sentiment>1?'🟢 긍정':'🟡 중립',
+      apiTag: apiName,
+      time: new Date().toLocaleTimeString('ko-KR',{hour12:false,hour:'2-digit',minute:'2-digit'}),
+      read: false, fromAPI: true, isDemo: art.url==='#',
+    };
+
+    state.alerts.unshift(alert);
+    count++;
+
+    if(maxScore>=25 && notifPermission && !alert.isDemo) {
+      new Notification(`${SIGNAL_LEVELS[getSignalLevel(maxScore)].emoji} ${SIGNAL_LEVELS[getSignalLevel(maxScore)].label}`, {
+        body:`${art.title?.slice(0,60)} | ${topTickers||'시장 영향 감지'}`,
+        tag: getSignalLevel(maxScore),
+        requireInteraction: maxScore>=70,
+      });
+      showSignalBanner(getSignalLevel(maxScore), art.title?.slice(0,50)||'', `${fig.name} · ${art.source?.name}`, topTickers);
+      if(navigator.vibrate) navigator.vibrate(SIGNAL_LEVELS[getSignalLevel(maxScore)].vibrate);
+    }
+  }
+  return count;
 }
 
 function updateNewsStatus(status){
-  const dot = document.getElementById('news-status-dot');
-  const txt = document.getElementById('news-status-txt');
+  const dot=document.getElementById('news-status-dot');
+  const txt=document.getElementById('news-status-txt');
   if(!dot||!txt) return;
+  const total = learnData.newsCount;
   if(status==='checking'){
-    dot.style.background='#fbbf24'; dot.style.boxShadow='0 0 8px #fbbf24';
-    txt.textContent='뉴스 수집 중...'; txt.style.color='#fbbf24';
+    dot.style.background='#fbbf24';dot.style.boxShadow='0 0 8px #fbbf24';
+    txt.textContent=`뉴스 수집 중... (누적 ${total}건)`;txt.style.color='#fbbf24';
   } else if(status==='new'){
-    dot.style.background='#ff4444'; dot.style.boxShadow='0 0 8px #ff4444';
-    txt.textContent='새 뉴스 감지!'; txt.style.color='#ff4444';
+    dot.style.background='#ff4444';dot.style.boxShadow='0 0 8px #ff4444';
+    txt.textContent=`새 뉴스 감지! (누적 ${total}건)`;txt.style.color='#ff4444';
     setTimeout(()=>updateNewsStatus('ok'),5000);
   } else {
-    dot.style.background='#4ade80'; dot.style.boxShadow='0 0 8px #4ade80';
-    txt.textContent='모니터링 중 (30분 주기)'; txt.style.color='#4ade80';
+    dot.style.background='#4ade80';dot.style.boxShadow='0 0 8px #4ade80';
+    txt.textContent=`모니터링 중 · 누적 ${total}건 · Currents+GNews 이중수집`;txt.style.color='#4ade80';
   }
 }
 
 function startMonitor(){
   if(newsCheckInterval) clearInterval(newsCheckInterval);
-  // 즉시 1회 실행
-  setTimeout(runNewsCheck, 2000);
-  // 이후 30분마다
-  newsCheckInterval = setInterval(runNewsCheck, 30*60*1000);
-
-  // FOMC 시간 체크 (분 단위)
+  setTimeout(runNewsCheck, 1500);
+  // 1시간마다 — Currents(실시간)+GNews(지연) 이중 수집
+  newsCheckInterval = setInterval(runNewsCheck, 60*60*1000);
   setInterval(()=>{
     const now=new Date();
-    const h=now.getHours(), m=now.getMinutes();
-    if(h===9&&m===0){
-      pushNotif('⚠ FOMC 시간 도달','Jerome Powell 발언 가능 구간 — 금리 관련 발언 주시');
+    if(now.getHours()===9&&now.getMinutes()===0){
+      pushNotif('⚠ FOMC 시간','Jerome Powell 발언 가능 구간');
     }
-  }, 60000);
+  },60000);
 }
 
 
@@ -1902,124 +2158,202 @@ function renderPattern(){
 }
 
 function forceNewsCheck(){
-  lastNewsCheck = 0; // 강제 초기화
+  lastNewsCheck = 0;
   runNewsCheck();
 }
 
 function renderNews(){
   const apiAlerts = state.alerts.filter(a=>a.fromAPI);
-  const manualAlerts = state.alerts.filter(a=>!a.fromAPI);
+  const hasKey = GNEWS_KEY !== 'GNEWS_KEY_HERE';
+
+  // 학습 통계 계산
+  const totalLearned = learnData.newsCount;
+  const figLearned = Object.entries(learnData.figStats)
+    .map(([id,fs])=>({id:+id,fig:state.figs.find(f=>f.id===+id),fs}))
+    .filter(x=>x.fig&&x.fs.totalNews>0)
+    .sort((a,b)=>b.fs.totalNews-a.fs.totalNews);
 
   document.getElementById('tab-news').innerHTML = `
-    <div class="sec">실시간 뉴스 — NewsAPI 자동 수집</div>
+    <div class="sec">실시간 뉴스 + 누적 학습 시스템</div>
 
-    <!-- 상태 카드 -->
-    <div style="padding:12px 14px;background:#08081c;border:1px solid #1a1a4a;
+    <!-- GNews 키 입력 -->
+    ${!hasKey?`
+    <div style="padding:14px;background:#120a00;border:1px solid #ff8c0044;
       border-radius:4px;margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <div id="news-card-dot" style="width:8px;height:8px;border-radius:50%;
-          background:#4ade80;box-shadow:0 0 8px #4ade80"></div>
-        <span style="font-size:11px;color:#eeeeff;font-family:sans-serif">NewsAPI 연동 완료</span>
-        <button onclick="forceNewsCheck()" style="margin-left:auto;padding:5px 14px;
-          border:1px solid #4a9eff;background:#0a1a3a;color:#4a9eff;
-          font-size:10px;cursor:pointer;border-radius:2px;font-family:var(--mono)">
-          🔄 지금 수집
-        </button>
+      <div style="font-size:11px;color:#ff8c00;margin-bottom:8px;font-family:sans-serif">
+        ⚡ GNews API 키 입력 시 실시간 뉴스 활성화
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-        <div style="text-align:center;padding:8px;background:#0a0a1e;border-radius:3px">
-          <div style="font-size:18px;font-weight:bold;color:#4a9eff;font-family:var(--mono)">${apiAlerts.length}</div>
-          <div style="font-size:8px;color:#446">수집된 뉴스</div>
-        </div>
-        <div style="text-align:center;padding:8px;background:#0a0a1e;border-radius:3px">
-          <div style="font-size:18px;font-weight:bold;color:#ff4444;font-family:var(--mono)">
-            ${apiAlerts.filter(a=>a.maxScore>=70).length}
-          </div>
-          <div style="font-size:8px;color:#446">즉시포착 신호</div>
-        </div>
-        <div style="text-align:center;padding:8px;background:#0a0a1e;border-radius:3px">
-          <div style="font-size:12px;font-weight:bold;color:#fbbf24;font-family:var(--mono)">30분</div>
-          <div style="font-size:8px;color:#446">수집 주기</div>
-        </div>
+      <div style="font-size:10px;color:#889;margin-bottom:10px;font-family:sans-serif;line-height:1.6">
+        1. <a href="https://gnews.io" target="_blank" style="color:#4a9eff">gnews.io</a> 접속 → 무료 가입 → API Key 복사<br>
+        2. 아래에 붙여넣기 → 저장
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="gnews-key-input" placeholder="GNews API Key 입력..."
+          style="flex:1;background:#0d0d28;border:1px solid #2a2a5a;color:#4a9eff;
+          padding:8px 12px;font-size:11px;border-radius:3px;font-family:var(--mono)">
+        <button onclick="saveGNewsKey()" style="padding:8px 16px;border:1px solid #4ade80;
+          background:#0a2a1a;color:#4ade80;font-size:10px;cursor:pointer;
+          border-radius:3px;font-family:var(--mono);white-space:nowrap">저장 + 시작</button>
+      </div>
+      <div style="margin-top:8px;font-size:9px;color:#446">
+        현재는 데모 뉴스로 학습 중 — 키 입력 시 실제 뉴스 수집 시작
+      </div>
+    </div>`:`
+    <div style="padding:8px 14px;background:#0a2a1a;border:1px solid #4ade8033;
+      border-radius:3px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <span style="color:#4ade80;font-size:12px">✅</span>
+      <span style="font-size:10px;color:#4ade80;font-family:sans-serif">GNews API 연결됨 — 실시간 뉴스 수집 중</span>
+      <button onclick="forceNewsCheck()" style="margin-left:auto;padding:4px 12px;
+        border:1px solid #4a9eff;background:#0a1a3a;color:#4a9eff;
+        font-size:9px;cursor:pointer;border-radius:2px;font-family:var(--mono)">🔄 지금 수집</button>
+    </div>`}
+
+    <!-- 누적 학습 현황 -->
+    <div class="sec">🧠 누적 학습 현황 — ${totalLearned}건 분석 완료</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      <div style="padding:10px;background:#08081c;border:1px solid #1a1a4a;border-radius:3px;text-align:center">
+        <div style="font-size:22px;font-weight:bold;color:#4a9eff;font-family:var(--mono)">${totalLearned}</div>
+        <div style="font-size:9px;color:#446">총 학습 뉴스</div>
+      </div>
+      <div style="padding:10px;background:#08081c;border:1px solid #1a1a4a;border-radius:3px;text-align:center">
+        <div style="font-size:22px;font-weight:bold;color:#ff4444;font-family:var(--mono)">${apiAlerts.filter(a=>a.maxScore>=70).length}</div>
+        <div style="font-size:9px;color:#446">즉시포착 신호</div>
+      </div>
+      <div style="padding:10px;background:#08081c;border:1px solid #1a1a4a;border-radius:3px;text-align:center">
+        <div style="font-size:22px;font-weight:bold;color:#fbbf24;font-family:var(--mono)">${Object.keys(learnData.figStats).length}</div>
+        <div style="font-size:9px;color:#446">학습된 인물</div>
       </div>
     </div>
 
-    <!-- 모니터링 인물 -->
+    <!-- 인물별 학습 현황 -->
+    ${figLearned.length>0?`
     <div style="margin-bottom:14px">
-      <div class="sec">모니터링 인물 (영향력 70점 이상)</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${getSortedFigs().filter(f=>f.inf>=70).map(fig=>`
-          <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;
-            background:${fig.color}0d;border:1px solid ${fig.color}33;border-radius:3px">
-            <div style="width:18px;height:18px;border-radius:50%;background:${fig.color}22;
-              border:1px solid ${fig.color}55;display:flex;align-items:center;
-              justify-content:center;font-size:7px;color:${fig.color};font-weight:bold">${fig.avatar}</div>
-            <span style="font-size:10px;color:${fig.color};font-family:sans-serif">${fig.name.split(' ')[0]}</span>
-            <span style="font-size:9px;color:#446">${fig.inf}pt</span>
-          </div>`).join('')}
-      </div>
-    </div>
+      <div class="sec">인물별 학습 통계 (영향력 점수 자동 보정 중)</div>
+      ${figLearned.map(({id,fig,fs})=>{
+        const negRatio = Math.round(fs.negCount/Math.max(fs.totalNews,1)*100);
+        const bonus = learnData.patternAdjust[id]||0;
+        const topSectors = Object.entries(fs.sectorHits||{})
+          .sort((a,b)=>b[1]-a[1]).slice(0,2).map(([s])=>s);
+        return `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+          background:#08081c;border:1px solid #1a1a4a;border-radius:3px;margin-bottom:6px">
+          <div style="width:26px;height:26px;border-radius:50%;
+            background:${fig.color}1a;border:1px solid ${fig.color}44;
+            display:flex;align-items:center;justify-content:center;
+            font-size:8px;color:${fig.color};font-weight:bold;flex-shrink:0">${fig.avatar}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;color:#eeeeff;font-family:sans-serif">${fig.name}</div>
+            <div style="display:flex;gap:8px;margin-top:3px;flex-wrap:wrap">
+              <span style="font-size:9px;color:#446">수집 <span style="color:#4a9eff">${fs.totalNews}건</span></span>
+              <span style="font-size:9px;color:#446">부정 <span style="color:#f87171">${negRatio}%</span></span>
+              ${topSectors.map(s=>`<span style="font-size:8px;padding:1px 5px;
+                background:${SM[s]?.color||'#888'}15;color:${SM[s]?.color||'#888'};
+                border:1px solid ${SM[s]?.color||'#888'}33;border-radius:2px">${SM[s]?.label||s}</span>`).join('')}
+            </div>
+          </div>
+          <div style="text-align:center;flex-shrink:0">
+            <div style="font-size:9px;color:#446;margin-bottom:2px">점수 보정</div>
+            <div style="font-size:14px;font-weight:bold;font-family:var(--mono);
+              color:${bonus>0?'#4ade80':'#446'}">
+              ${bonus>0?'+':''}${bonus}
+            </div>
+          </div>
+          <div style="text-align:center;flex-shrink:0">
+            <div style="font-size:9px;color:#446;margin-bottom:2px">현재 점수</div>
+            <div style="font-size:16px;font-weight:bold;font-family:var(--mono);color:${fig.color}">
+              ${fig.inf}
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`:''}
 
     <!-- 뉴스 피드 -->
     <div class="sec">최신 뉴스 피드 (${apiAlerts.length}건)</div>
     ${apiAlerts.length===0?`
-      <div style="text-align:center;padding:40px;color:#446;font-size:12px;font-family:sans-serif">
-        뉴스 수집 중...<br>
-        <span style="font-size:10px;color:#334">30초 후 자동 시작 또는 "지금 수집" 버튼 클릭</span>
-      </div>
-    `:''}
+      <div style="text-align:center;padding:30px;color:#446;font-size:11px;font-family:sans-serif">
+        🔄 뉴스 수집 중...<br>
+        <span style="font-size:9px;color:#334">잠시 후 자동으로 업데이트됩니다</span>
+      </div>`:''}
     ${apiAlerts.map(a=>{
-      const scoreColor = a.maxScore>=70?'#ff4444':a.maxScore>=45?'#ff8c00':a.maxScore>=25?'#fbbf24':'#446';
+      const sc=a.maxScore||0;
+      const scColor=sc>=70?'#ff4444':sc>=45?'#ff8c00':sc>=25?'#fbbf24':'#446';
+      const sentColor=a.sentiment<-1?'#f87171':a.sentiment>1?'#4ade80':'#fbbf24';
       return `
       <div style="padding:12px 14px;margin-bottom:8px;background:#08081c;
-        border:1px solid ${a.maxScore>=70?'#ff444433':a.maxScore>=45?'#ff8c0022':'#12123a'};
-        border-left:3px solid ${scoreColor};border-radius:3px;
-        ${a.read?'opacity:0.7':''}">
+        border:1px solid ${sc>=70?'#ff444433':sc>=45?'#ff8c0022':'#12123a'};
+        border-left:3px solid ${scColor};border-radius:3px">
         <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px">
-          <div style="width:26px;height:26px;border-radius:50%;flex-shrink:0;
+          <div style="width:24px;height:24px;border-radius:50%;flex-shrink:0;
             background:${a.figureColor||'#888'}1a;border:1px solid ${a.figureColor||'#888'}44;
             display:flex;align-items:center;justify-content:center;
-            font-size:8px;color:${a.figureColor||'#888'};font-weight:bold">
-            ${a.figureAvatar||'?'}
-          </div>
+            font-size:7px;color:${a.figureColor||'#888'};font-weight:bold">${a.figureAvatar||'?'}</div>
           <div style="flex:1;min-width:0">
             <div style="font-size:11px;color:#eeeeff;font-family:sans-serif;
-              line-height:1.5;margin-bottom:5px">${a.title}</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              line-height:1.5;margin-bottom:5px">${a.title}
+              ${a.isDemo?`<span style="font-size:8px;color:#446;margin-left:4px">[데모]</span>`:''}
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <span style="font-size:9px;color:#446">${a.source}</span>
               <span style="font-size:9px;color:#334">·</span>
-              <span style="font-size:9px;color:#446">${a.time||''}</span>
-              ${a.figureName?`<span style="font-size:9px;color:${a.figureColor}">${a.figureName}</span>`:''}
+              <span style="font-size:9px;color:#446">${a.time}</span>
+              ${a.apiTag?`<span style="font-size:8px;padding:1px 5px;border-radius:2px;
+                background:${a.apiTag==='Currents'?'#4a9eff22':'#fbbf24' +'22'};
+                color:${a.apiTag==='Currents'?'#4a9eff':'#fbbf24'};
+                border:1px solid ${a.apiTag==='Currents'?'#4a9eff44':'#fbbf2444'}">${a.apiTag}</span>`:''}
+              <span style="font-size:9px;color:${sentColor}">${a.sentimentLabel||'🟡 중립'}</span>
+              ${a.figureName?`<span style="font-size:9px;color:${a.figureColor}">${a.figureName.split(' ')[0]}</span>`:''}
             </div>
           </div>
-          ${a.maxScore>0?`
-          <div style="text-align:center;flex-shrink:0">
-            <div style="font-size:18px;font-weight:bold;color:${scoreColor};font-family:var(--mono)">${a.maxScore}</div>
+          ${sc>0?`<div style="text-align:center;flex-shrink:0">
+            <div style="font-size:18px;font-weight:bold;color:${scColor};font-family:var(--mono);line-height:1">${sc}</div>
             <div style="font-size:7px;color:#446">기회점수</div>
           </div>`:''}
         </div>
-        ${a.topTickers?`
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+        ${a.topTickers?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
           ${a.topTickers.split('·').map(t=>`
             <span style="font-size:9px;padding:2px 7px;background:#0a1a3a;
               border:1px solid #4a9eff33;color:#4a9eff;border-radius:2px;
               font-family:var(--mono)">${t}</span>`).join('')}
         </div>`:''}
-        ${a.sectors?.length?`
-        <div style="display:flex;gap:5px;flex-wrap:wrap">
-          ${a.sectors.map(s=>{
-            const sd=SM[s]; if(!sd) return '';
-            return `<span style="font-size:8px;padding:1px 6px;background:${sd.color}15;
+        ${(a.sectors?.length)?`<div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${a.sectors.map(s=>{const sd=SM[s];if(!sd)return'';
+            return`<span style="font-size:8px;padding:1px 6px;background:${sd.color}15;
               border:1px solid ${sd.color}33;color:${sd.color};border-radius:2px">${sd.label}</span>`;
           }).join('')}
         </div>`:''}
-        ${a.url?`
-        <a href="${a.url}" target="_blank" style="display:inline-block;margin-top:6px;
-          font-size:9px;color:#4a9eff;text-decoration:none">원문 보기 →</a>`:''}
+        ${a.url&&a.url!=='#'?`<a href="${a.url}" target="_blank"
+          style="display:inline-block;margin-top:6px;font-size:9px;color:#4a9eff;text-decoration:none">
+          원문 보기 →</a>`:''}
       </div>`;
     }).join('')}
+
+    <!-- 학습 초기화 버튼 -->
+    <div style="margin-top:20px;padding:10px 14px;background:#08081c;
+      border:1px solid #1a1a4a;border-radius:3px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:10px;color:#446;font-family:sans-serif">학습 데이터 초기화</span>
+      <button onclick="resetLearn()" style="margin-left:auto;padding:5px 12px;
+        border:1px solid #f87171;background:transparent;color:#f87171;
+        font-size:9px;cursor:pointer;border-radius:2px;font-family:var(--mono)">초기화</button>
+    </div>
   `;
 }
+
+function saveGNewsKey(){
+  const key = document.getElementById('gnews-key-input')?.value?.trim();
+  if(!key){alert('키를 입력해주세요');return;}
+  // 키를 localStorage에 저장 후 페이지 갱신
+  localStorage.setItem('ir_gnews_key', key);
+  alert('✅ GNews API 키 저장 완료!\n페이지를 새로고침하면 실시간 뉴스가 수집됩니다.');
+}
+
+function resetLearn(){
+  if(!confirm('학습 데이터를 초기화할까요?')) return;
+  learnData = {figStats:{},sectorStats:{},newsCount:0,lastUpdated:null,patternAdjust:{}};
+  saveLearn();
+  renderNews();
+}
+
 
 function buildDesktopNav(){
   const tabs = [['radar','레이더'],['stocks','종목'],['filter','기회필터'],['log','발언로그'],['sim','시뮬레이터'],['map','연관맵']];
@@ -2031,13 +2365,156 @@ function buildDesktopNav(){
   `).join('');
 }
 
+// ── PWA 설치 프롬프트
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  // 설치 버튼 표시 (Android Chrome)
+  const btn = document.getElementById('install-btn');
+  if(btn) btn.style.display = 'flex';
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredPrompt = null;
+  const btn = document.getElementById('install-btn');
+  if(btn) btn.style.display = 'none';
+  pushNotif('✅ 홈화면 추가 완료', 'Influence Radar가 홈화면에 설치됐습니다');
+});
+
+async function installApp() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isAndroid = /Android/.test(navigator.userAgent);
+
+  if(deferredPrompt) {
+    // Android Chrome — 네이티브 설치 프롬프트
+    deferredPrompt.prompt();
+    const {outcome} = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    if(outcome==='accepted') {
+      const btn = document.getElementById('install-btn');
+      if(btn) btn.style.display = 'none';
+    }
+  } else if(isIOS) {
+    // iOS Safari — 수동 안내
+    showIOSGuide();
+  } else {
+    // 기타 — 수동 안내
+    showIOSGuide();
+  }
+}
+
+function showIOSGuide() {
+  document.getElementById('ios-guide')?.remove();
+  const guide = document.createElement('div');
+  guide.id = 'ios-guide';
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  guide.style.cssText = `
+    position:fixed;bottom:0;left:0;right:0;z-index:9999;
+    background:#0a0a22;border-top:2px solid #4a9eff;
+    padding:20px 20px 34px;`;
+  guide.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <span style="font-size:13px;color:#eeeeff;font-family:sans-serif;font-weight:bold">📲 홈화면에 추가하는 방법</span>
+      <button onclick="document.getElementById('ios-guide').remove()"
+        style="background:none;border:none;color:#666;font-size:20px;cursor:pointer">✕</button>
+    </div>
+    ${isIOS ? `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
+        background:#08081c;border-radius:4px">
+        <span style="font-size:24px">1️⃣</span>
+        <div>
+          <div style="font-size:12px;color:#eeeeff;font-family:sans-serif">하단 공유 버튼 탭</div>
+          <div style="font-size:10px;color:#889;font-family:sans-serif">Safari 하단 중앙 □↑ 아이콘</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
+        background:#08081c;border-radius:4px">
+        <span style="font-size:24px">2️⃣</span>
+        <div>
+          <div style="font-size:12px;color:#eeeeff;font-family:sans-serif">"홈 화면에 추가" 선택</div>
+          <div style="font-size:10px;color:#889;font-family:sans-serif">스크롤해서 찾기</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
+        background:#08081c;border-radius:4px">
+        <span style="font-size:24px">3️⃣</span>
+        <div>
+          <div style="font-size:12px;color:#eeeeff;font-family:sans-serif">우상단 "추가" 탭</div>
+          <div style="font-size:10px;color:#889;font-family:sans-serif">홈화면에 레이더 앱 아이콘 생성</div>
+        </div>
+      </div>
+    </div>` : `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
+        background:#08081c;border-radius:4px">
+        <span style="font-size:24px">1️⃣</span>
+        <div>
+          <div style="font-size:12px;color:#eeeeff;font-family:sans-serif">Chrome 우상단 점 3개 메뉴</div>
+          <div style="font-size:10px;color:#889;font-family:sans-serif">⋮ 버튼 탭</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
+        background:#08081c;border-radius:4px">
+        <span style="font-size:24px">2️⃣</span>
+        <div>
+          <div style="font-size:12px;color:#eeeeff;font-family:sans-serif">"홈 화면에 추가" 탭</div>
+          <div style="font-size:10px;color:#889;font-family:sans-serif">또는 "앱 설치"</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;
+        background:#08081c;border-radius:4px">
+        <span style="font-size:24px">3️⃣</span>
+        <div>
+          <div style="font-size:12px;color:#eeeeff;font-family:sans-serif">"추가" 또는 "설치" 확인</div>
+          <div style="font-size:10px;color:#889;font-family:sans-serif">홈화면에 앱 아이콘 생성 완료</div>
+        </div>
+      </div>
+    </div>`}
+  `;
+  document.body.appendChild(guide);
+}
+
+// ── 첫 방문 시 자동 안내 (모바일)
+function checkInstallPrompt() {
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode:standalone)').matches;
+  const shown = localStorage.getItem('ir_install_shown');
+
+  if(isMobile && !isStandalone && !shown) {
+    localStorage.setItem('ir_install_shown', '1');
+    // 5초 후 안내 표시
+    setTimeout(() => {
+      const btn = document.getElementById('install-btn');
+      if(btn) {
+        btn.style.display = 'flex';
+        // 버튼 강조 애니메이션
+        btn.style.animation = 'installPulse 1s ease 3';
+      }
+      // iOS는 자동으로 안내 팝업
+      if(/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        showIOSGuide();
+      }
+    }, 5000);
+  }
+}
+
 window.onload = function(){
+  // 저장된 GNews 키 로드
+  const savedKey = localStorage.getItem('ir_gnews_key');
+  if(savedKey) {
+    // GNEWS_KEY 변수 업데이트 (런타임)
+    window._gnewsKey = savedKey;
+  }
   updateClock();
   setInterval(updateClock, 10000);
   buildDesktopNav();
   updateNotifBadge();
   startMonitor();
   renderRadar();
+  checkInstallPrompt(); // PWA 설치 안내
   // 초기 알림 요청 안내
   setTimeout(()=>{
     if('Notification' in window && Notification.permission==='default'){
