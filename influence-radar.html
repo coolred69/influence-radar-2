@@ -29,7 +29,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);
 .header-title{font-size:12px;letter-spacing:3px;color:#aabbdd;text-transform:uppercase;font-weight:600}
 .header-time{font-size:11px;color:#4a9eff;font-weight:600}
 /* ── TAB NAV (상단 스크롤형) */
-#nav{position:sticky;top:50px;z-index:190;
+#nav{position:sticky;top:87px;z-index:190;
   background:#0a0a22;border-bottom:2px solid #2a2a6a;
   display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;
   scrollbar-width:none;gap:0}
@@ -141,6 +141,18 @@ label{font-size:11px;color:#99aacc;display:block;margin-bottom:4px;
 <!-- NOTIFICATION PANEL -->
 <div id="notif-panel"></div>
 
+<!-- NEWS STATUS BAR -->
+<div id="news-bar" style="background:#04040f;border-bottom:1px solid #1a1a4a;
+  padding:5px 16px;display:flex;align-items:center;gap:10px;
+  position:sticky;top:52px;z-index:195;height:35px">
+  <div id="news-status-dot" style="width:7px;height:7px;border-radius:50%;
+    background:#fbbf24;box-shadow:0 0 8px #fbbf24;flex-shrink:0;animation:pulse 1.5s infinite"></div>
+  <span id="news-status-txt" style="font-size:10px;color:#fbbf24;font-family:var(--mono)">뉴스 API 초기화 중...</span>
+  <button onclick="forceNewsCheck()" style="margin-left:auto;font-size:9px;padding:3px 10px;
+    border:1px solid #2a2a5a;background:transparent;color:#99aacc;
+    cursor:pointer;border-radius:2px;font-family:var(--mono)">🔄 지금 수집</button>
+</div>
+
 <!-- TAB NAV (상단 스크롤) -->
 <nav id="nav">
   <button class="nav-btn active" onclick="switchTab('radar',this)">
@@ -171,6 +183,10 @@ label{font-size:11px;color:#99aacc;display:block;margin-bottom:4px;
     <svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
     과거 패턴
   </button>
+  <button class="nav-btn" onclick="switchTab('news',this)">
+    <svg viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>
+    실시간 뉴스
+  </button>
 </nav>
 
 <!-- CONTENT -->
@@ -182,6 +198,7 @@ label{font-size:11px;color:#99aacc;display:block;margin-bottom:4px;
   <div class="tab" id="tab-sim"></div>
   <div class="tab" id="tab-map"></div>
   <div class="tab" id="tab-pattern"></div>
+  <div class="tab" id="tab-news"></div>
 </div>
 
 <!-- DESKTOP TAB NAV (hidden) -->
@@ -790,29 +807,167 @@ function renderNotifPanel(){
 
 // 24시간 모니터링 시뮬레이션 (30초마다 체크)
 let monitorInterval;
-function startMonitor(){
-  if(monitorInterval) clearInterval(monitorInterval);
-  monitorInterval = setInterval(()=>{
-    const now = new Date();
-    const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
-    // FOMC 일정 체크 (매달 특정 시간 시뮬)
-    if(h===9&&m===0&&s<30){
-      pushNotif('⚠ FOMC 시간 도달','Jerome Powell 발언 가능 구간 — 금리 관련 발언 주시');
-    }
-    // 랜덤 시뮬 알림 (데모용)
-    if(Math.random()<0.003){
-      const demos=[
-        {t:'📡 Musk X 게시물 감지',b:'@elonmusk — AI 관련 발언 포착. 즉시 확인 필요'},
-        {t:'📡 Trump Truth Social',b:'관세 관련 새 포스팅 감지 — 시장 영향 평가 필요'},
-        {t:'📡 Powell 발언 알림',b:'연준 관련 뉴스 헤드라인 — FINANCE 섹터 주시'},
-      ];
-      const d=demos[Math.floor(Math.random()*demos.length)];
-      pushNotif(d.t,d.b);
-    }
-  },30000);
+// ═══════════════════════════════════════
+// NEWS API 연동
+// ═══════════════════════════════════════
+const NEWS_API_KEY = 'aa77d6160bfe48c686838c4dececc003';
+const NEWS_API_URL = 'https://newsapi.org/v2/everything';
+
+// 인물별 검색 키워드
+const FIG_KEYWORDS = {
+  1: ['Trump tariff','Trump stock market','Trump trade','Trump crypto','Trump economy'],
+  2: ['Elon Musk Tesla','Elon Musk xAI','Elon Musk tweet','Musk DOGE','Musk stock'],
+  3: ['Jerome Powell Fed','Federal Reserve rate','FOMC statement','Powell interest'],
+  4: ['Xi Jinping economy','China semiconductor','China tech crackdown','Beijing policy'],
+  5: ['Jensen Huang Nvidia','NVDA earnings','Nvidia AI','Jensen Huang GTC'],
+  6: ['Warren Buffett Berkshire','Buffett sell','Buffett buy','Berkshire portfolio'],
+  7: ['Jamie Dimon JPMorgan','Dimon economy','JPMorgan outlook'],
+  8: ['Sam Altman OpenAI','ChatGPT regulation','OpenAI funding'],
+  9: ['OPEC oil price','Saudi Arabia MBS','oil supply cut'],
+};
+
+// 섹터 키워드 매핑
+const SECTOR_KEYWORDS = {
+  AI:['artificial intelligence crash','AI bubble','AI regulation','AI stock'],
+  SEMICON:['semiconductor ban','chip export','TSMC Taiwan','ASML restriction'],
+  EV:['electric vehicle subsidy','EV tax credit','Tesla recall','BYD competition'],
+  CRYPTO:['Bitcoin crash','crypto regulation','SEC crypto','crypto ban'],
+  ENERGY:['oil price surge','Iran war oil','OPEC cut','energy crisis'],
+  TRADE:['tariff','trade war','import duty','sanctions'],
+};
+
+let lastNewsCheck = 0;
+let newsCheckInterval = null;
+let latestNews = [];
+
+async function fetchNews(query) {
+  try {
+    const from = new Date(Date.now() - 6*60*60*1000).toISOString(); // 최근 6시간
+    const url = `${NEWS_API_URL}?q=${encodeURIComponent(query)}&from=${from}&sortBy=publishedAt&language=en&pageSize=5&apiKey=${NEWS_API_KEY}`;
+    const res = await fetch(url);
+    if(!res.ok) return [];
+    const data = await res.json();
+    return data.articles || [];
+  } catch(e) {
+    return [];
+  }
 }
 
-// ═══════════════════════════════════════
+async function runNewsCheck() {
+  const now = Date.now();
+  // 30분마다 체크
+  if(now - lastNewsCheck < 30*60*1000) return;
+  lastNewsCheck = now;
+
+  updateNewsStatus('checking');
+
+  const figs = getSortedFigs().filter(f=>f.inf>=70);
+  let newAlerts = 0;
+
+  for(const fig of figs.slice(0,4)) { // API 절약 — 상위 4명만
+    const keywords = FIG_KEYWORDS[fig.id];
+    if(!keywords) continue;
+
+    const query = keywords[Math.floor(Math.random()*keywords.length)];
+    const articles = await fetchNews(query);
+
+    for(const art of articles.slice(0,2)) {
+      const isNew = !state.alerts.find(a=>a.url===art.url);
+      if(!isNew) continue;
+
+      // 영향 섹터 자동 감지
+      const title = (art.title||'').toLowerCase();
+      const desc = (art.description||'').toLowerCase();
+      const combined = title+' '+desc;
+
+      const affectedSectors = Object.entries(SECTOR_KEYWORDS)
+        .filter(([sec,kws])=>kws.some(kw=>combined.includes(kw.toLowerCase())))
+        .map(([sec])=>sec);
+
+      // 기회점수 계산 (평균 -10% 가정)
+      const oppScores = affectedSectors.flatMap(sec=>{
+        const sd = SM[sec]; if(!sd) return [];
+        return sd.d.map(s=>({ticker:s.t,score:opp(fig.inf,s.f,10)}));
+      }).sort((a,b)=>b.score-a.score).slice(0,3);
+
+      const topTickers = oppScores.filter(x=>x.score>=45).map(x=>x.ticker).join('·');
+      const maxScore = oppScores[0]?.score||0;
+
+      const alert = {
+        id: Date.now()+Math.random(),
+        figureId: fig.id,
+        figureName: fig.name,
+        figureColor: fig.color,
+        figureAvatar: fig.avatar,
+        title: art.title,
+        source: art.source?.name||'News',
+        url: art.url,
+        publishedAt: art.publishedAt,
+        sectors: affectedSectors,
+        topTickers,
+        maxScore,
+        time: new Date(art.publishedAt).toLocaleTimeString('ko-KR',{hour12:false,hour:'2-digit',minute:'2-digit'}),
+        read: false,
+        fromAPI: true,
+      };
+
+      state.alerts.unshift(alert);
+      newAlerts++;
+
+      // 고점수 알림은 푸시
+      if(maxScore>=45 && notifPermission) {
+        new Notification(`📡 ${fig.name} 관련 뉴스`, {
+          body: `${art.title?.slice(0,60)}... | ${topTickers||affectedSectors[0]||''}`,
+        });
+      }
+    }
+  }
+
+  if(state.alerts.length>100) state.alerts=state.alerts.slice(0,100);
+  save();
+  updateNotifBadge();
+  updateNewsStatus(newAlerts>0?'new':'ok');
+
+  // 현재 레이더 탭이면 다시 렌더
+  if(state.currentTab==='radar') renderRadarNewsBar();
+  if(state.currentTab==='news') renderNews();
+}
+
+function updateNewsStatus(status){
+  const dot = document.getElementById('news-status-dot');
+  const txt = document.getElementById('news-status-txt');
+  if(!dot||!txt) return;
+  if(status==='checking'){
+    dot.style.background='#fbbf24'; dot.style.boxShadow='0 0 8px #fbbf24';
+    txt.textContent='뉴스 수집 중...'; txt.style.color='#fbbf24';
+  } else if(status==='new'){
+    dot.style.background='#ff4444'; dot.style.boxShadow='0 0 8px #ff4444';
+    txt.textContent='새 뉴스 감지!'; txt.style.color='#ff4444';
+    setTimeout(()=>updateNewsStatus('ok'),5000);
+  } else {
+    dot.style.background='#4ade80'; dot.style.boxShadow='0 0 8px #4ade80';
+    txt.textContent='모니터링 중 (30분 주기)'; txt.style.color='#4ade80';
+  }
+}
+
+function startMonitor(){
+  if(newsCheckInterval) clearInterval(newsCheckInterval);
+  // 즉시 1회 실행
+  setTimeout(runNewsCheck, 2000);
+  // 이후 30분마다
+  newsCheckInterval = setInterval(runNewsCheck, 30*60*1000);
+
+  // FOMC 시간 체크 (분 단위)
+  setInterval(()=>{
+    const now=new Date();
+    const h=now.getHours(), m=now.getMinutes();
+    if(h===9&&m===0){
+      pushNotif('⚠ FOMC 시간 도달','Jerome Powell 발언 가능 구간 — 금리 관련 발언 주시');
+    }
+  }, 60000);
+}
+
+
 // TAB SYSTEM
 // ═══════════════════════════════════════
 function switchTab(name, btn){
@@ -837,6 +992,7 @@ function render(name){
     case 'sim': renderSim(); break;
     case 'map': renderMap(); break;
     case 'pattern': renderPattern(); break;
+    case 'news': renderNews(); break;
   }
 }
 
@@ -1742,6 +1898,126 @@ function renderPattern(){
       }).join('')}
     </div>
     ` : `<div style="text-align:center;padding:40px;color:#446">이 인물의 패턴 데이터가 없습니다</div>`}
+  `;
+}
+
+function forceNewsCheck(){
+  lastNewsCheck = 0; // 강제 초기화
+  runNewsCheck();
+}
+
+function renderNews(){
+  const apiAlerts = state.alerts.filter(a=>a.fromAPI);
+  const manualAlerts = state.alerts.filter(a=>!a.fromAPI);
+
+  document.getElementById('tab-news').innerHTML = `
+    <div class="sec">실시간 뉴스 — NewsAPI 자동 수집</div>
+
+    <!-- 상태 카드 -->
+    <div style="padding:12px 14px;background:#08081c;border:1px solid #1a1a4a;
+      border-radius:4px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div id="news-card-dot" style="width:8px;height:8px;border-radius:50%;
+          background:#4ade80;box-shadow:0 0 8px #4ade80"></div>
+        <span style="font-size:11px;color:#eeeeff;font-family:sans-serif">NewsAPI 연동 완료</span>
+        <button onclick="forceNewsCheck()" style="margin-left:auto;padding:5px 14px;
+          border:1px solid #4a9eff;background:#0a1a3a;color:#4a9eff;
+          font-size:10px;cursor:pointer;border-radius:2px;font-family:var(--mono)">
+          🔄 지금 수집
+        </button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div style="text-align:center;padding:8px;background:#0a0a1e;border-radius:3px">
+          <div style="font-size:18px;font-weight:bold;color:#4a9eff;font-family:var(--mono)">${apiAlerts.length}</div>
+          <div style="font-size:8px;color:#446">수집된 뉴스</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:#0a0a1e;border-radius:3px">
+          <div style="font-size:18px;font-weight:bold;color:#ff4444;font-family:var(--mono)">
+            ${apiAlerts.filter(a=>a.maxScore>=70).length}
+          </div>
+          <div style="font-size:8px;color:#446">즉시포착 신호</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:#0a0a1e;border-radius:3px">
+          <div style="font-size:12px;font-weight:bold;color:#fbbf24;font-family:var(--mono)">30분</div>
+          <div style="font-size:8px;color:#446">수집 주기</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 모니터링 인물 -->
+    <div style="margin-bottom:14px">
+      <div class="sec">모니터링 인물 (영향력 70점 이상)</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${getSortedFigs().filter(f=>f.inf>=70).map(fig=>`
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;
+            background:${fig.color}0d;border:1px solid ${fig.color}33;border-radius:3px">
+            <div style="width:18px;height:18px;border-radius:50%;background:${fig.color}22;
+              border:1px solid ${fig.color}55;display:flex;align-items:center;
+              justify-content:center;font-size:7px;color:${fig.color};font-weight:bold">${fig.avatar}</div>
+            <span style="font-size:10px;color:${fig.color};font-family:sans-serif">${fig.name.split(' ')[0]}</span>
+            <span style="font-size:9px;color:#446">${fig.inf}pt</span>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- 뉴스 피드 -->
+    <div class="sec">최신 뉴스 피드 (${apiAlerts.length}건)</div>
+    ${apiAlerts.length===0?`
+      <div style="text-align:center;padding:40px;color:#446;font-size:12px;font-family:sans-serif">
+        뉴스 수집 중...<br>
+        <span style="font-size:10px;color:#334">30초 후 자동 시작 또는 "지금 수집" 버튼 클릭</span>
+      </div>
+    `:''}
+    ${apiAlerts.map(a=>{
+      const scoreColor = a.maxScore>=70?'#ff4444':a.maxScore>=45?'#ff8c00':a.maxScore>=25?'#fbbf24':'#446';
+      return `
+      <div style="padding:12px 14px;margin-bottom:8px;background:#08081c;
+        border:1px solid ${a.maxScore>=70?'#ff444433':a.maxScore>=45?'#ff8c0022':'#12123a'};
+        border-left:3px solid ${scoreColor};border-radius:3px;
+        ${a.read?'opacity:0.7':''}">
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px">
+          <div style="width:26px;height:26px;border-radius:50%;flex-shrink:0;
+            background:${a.figureColor||'#888'}1a;border:1px solid ${a.figureColor||'#888'}44;
+            display:flex;align-items:center;justify-content:center;
+            font-size:8px;color:${a.figureColor||'#888'};font-weight:bold">
+            ${a.figureAvatar||'?'}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;color:#eeeeff;font-family:sans-serif;
+              line-height:1.5;margin-bottom:5px">${a.title}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <span style="font-size:9px;color:#446">${a.source}</span>
+              <span style="font-size:9px;color:#334">·</span>
+              <span style="font-size:9px;color:#446">${a.time||''}</span>
+              ${a.figureName?`<span style="font-size:9px;color:${a.figureColor}">${a.figureName}</span>`:''}
+            </div>
+          </div>
+          ${a.maxScore>0?`
+          <div style="text-align:center;flex-shrink:0">
+            <div style="font-size:18px;font-weight:bold;color:${scoreColor};font-family:var(--mono)">${a.maxScore}</div>
+            <div style="font-size:7px;color:#446">기회점수</div>
+          </div>`:''}
+        </div>
+        ${a.topTickers?`
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+          ${a.topTickers.split('·').map(t=>`
+            <span style="font-size:9px;padding:2px 7px;background:#0a1a3a;
+              border:1px solid #4a9eff33;color:#4a9eff;border-radius:2px;
+              font-family:var(--mono)">${t}</span>`).join('')}
+        </div>`:''}
+        ${a.sectors?.length?`
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          ${a.sectors.map(s=>{
+            const sd=SM[s]; if(!sd) return '';
+            return `<span style="font-size:8px;padding:1px 6px;background:${sd.color}15;
+              border:1px solid ${sd.color}33;color:${sd.color};border-radius:2px">${sd.label}</span>`;
+          }).join('')}
+        </div>`:''}
+        ${a.url?`
+        <a href="${a.url}" target="_blank" style="display:inline-block;margin-top:6px;
+          font-size:9px;color:#4a9eff;text-decoration:none">원문 보기 →</a>`:''}
+      </div>`;
+    }).join('')}
   `;
 }
 
