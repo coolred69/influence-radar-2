@@ -2689,7 +2689,7 @@ window.onload = function(){
         console.log('✅ Firebase 데이터 로드 완료');
       }
 
-      // 실시간 동기화 — 다른 기기에서 변경 시 자동 반영
+// 실시간 동기화 — 다른 기기에서 변경 시 자동 반영
       if(window.fbListen) {
         window.fbListen((data) => {
           if(data.logs?.length > state.logs.length) {
@@ -2708,6 +2708,25 @@ window.onload = function(){
     }
   }, 2000);
 };
+
+// ── Service Worker 등록부 (최종 위치)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('firebase-messaging-sw.js', { scope: './' })
+    .then(reg => {
+      console.log('✅ FCM Service Worker 등록 완료:', reg.scope);
+      if (window.fbInitFCM) {
+        window.fbInitFCM(reg); 
+      }
+    })
+    .catch(err => {
+      console.error('❌ SW 등록 실패:', err);
+      const fbSt = document.getElementById('fb-status');
+      if (fbSt) { 
+        fbSt.textContent = '⚠️ FCM 연결 실패'; 
+        fbSt.style.color = '#f87171'; 
+      }
+    });
+}
 </script>
 </body>
 </html>
