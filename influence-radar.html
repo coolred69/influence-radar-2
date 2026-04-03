@@ -1818,11 +1818,12 @@ async function fetchCurrents(query) {
 }
 
 // ── GNews API (12시간 지연, CORS 차단 → 프록시 우회 시도)
-async function fetchGNewsAPI(query) {
+async function fetchGNewsAPI(query, fromDate=null, toDate=null) {
   try {
-    // CORS 우회: allorigins 프록시 사용
-    const target = `${GNEWS_URL}?q=${encodeURIComponent(query)}&lang=en&max=5&apikey=${GNEWS_KEY}`;
-    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`;
+    let url = `${GNEWS_URL}?q=${encodeURIComponent(query)}&lang=en&max=10&apikey=${GNEWS_KEY}`;
+    if(fromDate) url += `&from=${fromDate}`;
+    if(toDate) url += `&to=${toDate}`;
+    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
     const res = await fetch(proxy);
     if(!res.ok) return [];
     const data = await res.json();
@@ -1836,6 +1837,126 @@ async function fetchGNewsAPI(query) {
     }));
   } catch(e) { return []; }
 }
+
+// ── 백데이터 수집 (과거 1달 실제 뉴스)
+let backfillRunning = false;
+
+async function runBackfill() {
+  if(backfillRunning) return;
+  backfillRunning = true;
+
+  const btn = document.getElementById('backfill-btn');
+  const prog = document.getElementById('backfill-prog');
+  if(btn) { btn.disabled=true; btn.textContent='수집 중...'; }
+
+  // 과거 30일을 7일씩 4구간으로 분할
+  const now = new Date();
+  const weeks = [
+    [28,21], [21,14], [14,7], [7,0]
+  ].map(([a,b])=>[
+    new Date(now-a*86400000).toISOString().split('T')[0],
+    new Date(now-b*86400000).toISOString().split('T')[0],
+  ]);
+
+  // 인물 키워드 (실제 뉴스에서 잘 걸리는 키워드)
+  const backfillQueries = [
+    {figId:1, q:'Trump tariff trade policy'},
+    {figId:1, q:'Trump stock market economy'},
+    {figId:2, q:'Elon Musk Tesla xAI'},
+    {figId:2, q:'Musk DOGE government'},
+    {figId:3, q:'Federal Reserve interest rate Powell'},
+    {figId:4, q:'China semiconductor trade Xi'},
+    {figId:5, q:'Nvidia Jensen Huang AI chip'},
+    {figId:6, q:'Buffett Berkshire investment'},
+  ];
+
+  let totalFetched = 0;
+  let totalNew = 0;
+
+  for(let wi=0; wi<weeks.length; wi++) {
+    const [from, to] = weeks[wi];
+    if(prog) prog.textContent = `${wi+1}/4주차 수집 중... (${from} ~ ${to})`;
+
+    for(const {figId, q} of backfillQueries) {
+      const articles = await fetchGNewsAPI(q, from+'T00:00:00Z', to+'T23:59:59Z');
+      totalFetched += articles.length;
+
+      const fig = state.figs.find(f=>f.id===figId);
+      if(!fig) continue;
+
+      for(const art of articles.slice(0,3)) {
+        // 실제 URL만 처리 (데모 완전 차단)
+        if(!art.url || art.url==='#' || !art.url.startsWith('http')) continue;
+        // 중복 체크
+        if(signalLog.find(s=>s.url===art.url)) continue;
+        if(state.alerts.find(a=>a.url===art.url)) continue;
+
+        const combined = (art.title||'')+' '+(art.description||'');
+        const sentiment = analyzeSentiment(combined);
+        const combined_low = combined.toLowerCase();
+
+        const affectedSectors = Object.entries(SECTOR_KEYWORDS)
+          .filter(([,kws])=>kws.some(kw=>combined_low.includes(kw.toLowerCase())))
+          .map(([sec])=>sec);
+
+        const estDrop = sentiment<0?10:4;
+        const oppScores = affectedSectors.flatMap(sec=>{
+          const sd=SM[sec]; if(!sd) return [];
+          return sd.d.map(s=>({ticker:s.t,score:opp(fig.inf,s.f,estDrop)}));
+        }).sort((a,b)=>b.score-a.score);
+
+        const topTickers = oppScores.filter(x=>x.score>=45).map(x=>x.ticker).slice(0,3).join('·');
+        const maxScore = oppScores[0]?.score||0;
+        if(maxScore<25) continue; // 25점 미만 제외
+
+        const titleKO = await translateKO(art.title||'');
+
+        learnFromNews(figId, art, sentiment, affectedSectors);
+
+        const alertObj = {
+          id: new Date(art.publishedAt).getTime()+Math.random(),
+          figureId: figId, figureName: fig.name,
+          figureColor: fig.color, figureAvatar: fig.avatar,
+          title: titleKO, titleOrig: art.title,
+          source: art.source?.name||'GNews',
+          url: art.url, publishedAt: art.publishedAt,
+          sectors: affectedSectors, topTickers,
+          tickers: topTickers,
+          maxScore, score: maxScore, sentiment,
+          sentimentLabel: sentiment<-1?'🔴 부정':sentiment>1?'🟢 긍정':'🟡 중립',
+          apiTag: 'GNews',
+          time: new Date(art.publishedAt).toLocaleDateString('ko-KR',{month:'short',day:'numeric'}),
+          read: true, // 과거 뉴스는 읽음 처리
+          fromAPI: true, isDemo: false,
+          isBackfill: true, // 백데이터 표시
+        };
+
+        state.alerts.push(alertObj);
+        if(maxScore>=45) {
+          addToSignalLog(alertObj);
+          totalNew++;
+        }
+      }
+      // API 요청 간격
+      await new Promise(r=>setTimeout(r,500));
+    }
+    save();
+  }
+
+  saveLearn();
+  backfillRunning = false;
+  if(btn) { btn.disabled=false; btn.textContent='📥 과거 뉴스 재수집'; }
+  if(prog) prog.textContent = `✅ 완료 — 뉴스 ${totalFetched}건 분석, 시그널 ${totalNew}건 추가`;
+
+  // 탭 새로고침
+  if(state.currentTab==='sim') renderSim();
+  if(state.currentTab==='learn') renderLearnDashboard();
+  if(state.currentTab==='filter') renderFilter();
+  if(state.currentTab==='news') renderNews();
+}
+
+// ── fetchMockNews 완전 제거 (실제 뉴스만 사용)
+// function fetchMockNews() — 삭제됨 (가짜 데이터 사용 안 함)
 
 // ── 통합 뉴스 수집 (중복 URL 제거)
 async function fetchAllNews(query) {
@@ -1853,26 +1974,6 @@ async function fetchAllNews(query) {
   return merged;
 }
 
-// ── 키 없을 때 데모 뉴스
-async function fetchGNews(query) {
-  return fetchAllNews(query);
-}
-
-// ── 키 없을 때 샘플 뉴스 (데모용)
-function fetchMockNews(query){
-  const mocks = [
-    {title:`Trump signals new tariff expansion on tech imports`,description:`President Trump indicated further tariff measures could target semiconductor and AI hardware imports, rattling markets`,url:'#',publishedAt:new Date().toISOString(),source:{name:'Reuters (Demo)'}},
-    {title:`Elon Musk tweets support for AI deregulation, Tesla shares jump`,description:`Musk's latest post on X called for removing AI development restrictions, sending Tesla and Nvidia stocks higher in premarket`,url:'#',publishedAt:new Date().toISOString(),source:{name:'Bloomberg (Demo)'}},
-    {title:`Fed's Powell warns equity valuations remain historically elevated`,description:`Federal Reserve chairman Jerome Powell reiterated concerns about stretched stock valuations during congressional testimony`,url:'#',publishedAt:new Date().toISOString(),source:{name:'WSJ (Demo)'}},
-    {title:`Nvidia GTC keynote: Jensen Huang unveils next-gen Blackwell Ultra chip`,description:`CEO Jensen Huang announced massive compute upgrades sending semiconductor stocks surging across the board`,url:'#',publishedAt:new Date().toISOString(),source:{name:'CNBC (Demo)'}},
-    {title:`China threatens semiconductor export controls in trade dispute escalation`,description:`Beijing officials warned of potential restrictions on rare earth exports and chip manufacturing equipment`,url:'#',publishedAt:new Date().toISOString(),source:{name:'FT (Demo)'}},
-  ];
-  const q = query.toLowerCase();
-  const relevant = mocks.filter(m=>
-    m.title.toLowerCase().split(' ').some(w=>q.includes(w))
-  );
-  return relevant.length ? relevant.slice(0,2) : mocks.slice(0,1);
-}
 
 async function runNewsCheck() {
   const now = Date.now();
@@ -1920,7 +2021,9 @@ async function processArticles(fig, articles, apiName) {
   let count = 0;
   for(const art of articles.slice(0,2)) {
     const key = art.url&&art.url!=='#' ? art.url : art.title;
-    const isNew = !state.alerts.find(a=>(a.url===art.url||a.title===art.title)&&a.url!=='#');
+    const isNew = art.url==='#'
+      ? !state.alerts.find(a=>a.title===art.title&&a.isDemo) // 데모: 제목 기준
+      : !state.alerts.find(a=>a.url===art.url);
     if(!isNew && art.url!=='#') continue;
 
     const combined = (art.title||'')+' '+(art.description||'');
@@ -1959,7 +2062,7 @@ async function processArticles(fig, articles, apiName) {
       sentimentLabel: sentiment<-1?'🔴 부정':sentiment>1?'🟢 긍정':'🟡 중립',
       apiTag: apiName,
       time: new Date().toLocaleTimeString('ko-KR',{hour12:false,hour:'2-digit',minute:'2-digit'}),
-      read: false, fromAPI: true, isDemo: art.url==='#',
+      read: false, fromAPI: true, isDemo: false,
     };
 
     state.alerts.unshift(alert);
@@ -2965,6 +3068,27 @@ function renderSim(){
 
   document.getElementById('tab-sim').innerHTML = `
     <div class="sec">시그널 기록 — 팝업 발생 내역</div>
+
+    <!-- 백데이터 없을 때 수집 안내 -->
+    ${signalLog.length<5?`
+    <div style="padding:12px 14px;background:#0a1a0a;border:1px solid #4ade8033;
+      border-radius:4px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="flex:1">
+        <div style="font-size:11px;color:#4ade80;font-family:sans-serif;margin-bottom:2px">
+          📥 과거 뉴스로 백데이터 채우기
+        </div>
+        <div style="font-size:9px;color:#446">실제 뉴스만 · GNews API · 1달치</div>
+        <div id="backfill-prog" style="font-size:9px;color:#4a9eff;margin-top:2px"></div>
+      </div>
+      <button id="backfill-btn" onclick="runBackfill()"
+        style="padding:8px 16px;border:1px solid #4ade80;background:#0a2a1a;
+          color:#4ade80;font-size:10px;cursor:pointer;border-radius:3px;
+          font-family:var(--mono);white-space:nowrap;flex-shrink:0">
+        📥 백데이터 수집
+      </button>
+    </div>`:''}
+
+    <div class="sec" style="margin-top:0">시그널 기록</div>
 
     <!-- 적중률 종합 -->
     ${overallHitRate!==null||avgPredProb!==null?`
@@ -4163,6 +4287,24 @@ function renderLearnDashboard() {
 
   document.getElementById('tab-learn').innerHTML = `
     <div class="sec">학습 대시보드 — 누적 성과 + AI 추천</div>
+
+    <!-- 백데이터 수집 버튼 -->
+    <div style="padding:12px 14px;background:#08081c;border:1px solid #4a9eff33;
+      border-radius:4px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:#eeeeff;font-family:sans-serif;margin-bottom:3px">📥 과거 1달 뉴스 백데이터 수집</div>
+          <div style="font-size:9px;color:#446">실제 뉴스만 사용 · GNews API · 한국어 번역 포함</div>
+          <div id="backfill-prog" style="font-size:9px;color:#4a9eff;margin-top:3px"></div>
+        </div>
+        <button id="backfill-btn" onclick="runBackfill()"
+          style="padding:8px 16px;border:1px solid #4a9eff;background:#0a1a3a;
+            color:#4a9eff;font-size:10px;cursor:pointer;border-radius:3px;
+            font-family:var(--mono);white-space:nowrap;flex-shrink:0">
+          📥 과거 뉴스 수집
+        </button>
+      </div>
+    </div>
 
     <!-- 종합 성과 -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
