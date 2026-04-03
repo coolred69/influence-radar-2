@@ -1945,8 +1945,9 @@ async function runBackfill() {
 
   saveLearn();
   backfillRunning = false;
-  if(btn) { btn.disabled=false; btn.textContent='📥 과거 뉴스 재수집'; }
-  if(prog) prog.textContent = `✅ 완료 — 뉴스 ${totalFetched}건 분석, 시그널 ${totalNew}건 추가`;
+  localStorage.setItem('ir_backfill_done', '1'); // 완료 플래그
+  if(btn) { btn.style.display='none'; } // 완료 후 버튼 숨김
+  if(prog) prog.textContent = `✅ 완료 — 뉴스 ${totalFetched}건 분석, 시그널 ${totalNew}건 추가 (다시 수집 불필요)`;
 
   // 탭 새로고침
   if(state.currentTab==='sim') renderSim();
@@ -3070,7 +3071,7 @@ function renderSim(){
     <div class="sec">시그널 기록 — 팝업 발생 내역</div>
 
     <!-- 백데이터 없을 때 수집 안내 -->
-    ${signalLog.length<5?`
+    ${!localStorage.getItem('ir_backfill_done')&&signalLog.length<5?`
     <div style="padding:12px 14px;background:#0a1a0a;border:1px solid #4ade8033;
       border-radius:4px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <div style="flex:1">
@@ -4300,7 +4301,8 @@ function renderLearnDashboard() {
         <button id="backfill-btn" onclick="runBackfill()"
           style="padding:8px 16px;border:1px solid #4a9eff;background:#0a1a3a;
             color:#4a9eff;font-size:10px;cursor:pointer;border-radius:3px;
-            font-family:var(--mono);white-space:nowrap;flex-shrink:0">
+            font-family:var(--mono);white-space:nowrap;flex-shrink:0;
+            display:${localStorage.getItem('ir_backfill_done')?'none':'block'}">
           📥 과거 뉴스 수집
         </button>
       </div>
