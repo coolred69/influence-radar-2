@@ -745,6 +745,92 @@ const PRICES = {
   LMT:480,  RTX:128,  NOC:510,   PLTR:85,  HII:220,
 };
 
+// 실시간 현재가 캐시
+let livePrices = JSON.parse(localStorage.getItem('ir_live_prices') || '{}');
+let priceUpdatedAt = localStorage.getItem('ir_price_updated') || null;
+
+// ── Yahoo Finance 실시간 현재가 (allorigins 프록시 우회)
+async function fetchLivePrices(tickers) {
+  const symbols = tickers.join(',');
+  try {
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}&fields=regularMarketPrice,regularMarketChangePercent,regularMarketChange`;
+    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const res = await fetch(proxy);
+    if(!res.ok) return {};
+    const data = await res.json();
+    const result = {};
+    (data?.quoteResponse?.result || []).forEach(q => {
+      if(q.regularMarketPrice) {
+        result[q.symbol] = {
+          price: Math.round(q.regularMarketPrice * 100) / 100,
+          change: Math.round((q.regularMarketChange||0) * 100) / 100,
+          changePct: Math.round((q.regularMarketChangePercent||0) * 100) / 100,
+        };
+      }
+    });
+    return result;
+  } catch(e) {
+    return {};
+  }
+}
+
+// ── 전체 종목 현재가 업데이트 (15분마다)
+async function updateAllPrices() {
+  const now = Date.now();
+  const lastUpdate = priceUpdatedAt ? parseInt(priceUpdatedAt) : 0;
+  if(now - lastUpdate < 15*60*1000) return; // 15분 이내면 스킵
+
+  const allTickers = Object.keys(PRICES);
+  // 한번에 20개씩 분할 요청
+  const chunks = [];
+  for(let i=0; i<allTickers.length; i+=20) chunks.push(allTickers.slice(i,i+20));
+
+  for(const chunk of chunks) {
+    const result = await fetchLivePrices(chunk);
+    Object.assign(livePrices, result);
+    // PRICES 테이블도 업데이트
+    Object.entries(result).forEach(([sym, data]) => {
+      PRICES[sym] = data.price;
+    });
+  }
+
+  if(Object.keys(livePrices).length > 0) {
+    localStorage.setItem('ir_live_prices', JSON.stringify(livePrices));
+    localStorage.setItem('ir_price_updated', String(now));
+    priceUpdatedAt = String(now);
+    const t = new Date().toLocaleTimeString('ko-KR',{hour12:false,hour:'2-digit',minute:'2-digit'});
+    const txt = document.getElementById('news-status-txt');
+    if(txt) txt.title = `현재가 마지막 업데이트: ${t}`;
+    console.log(`✅ 현재가 업데이트: ${Object.keys(livePrices).length}개 종목 (${t})`);
+  }
+}
+
+// ── 단일 종목 현재가 즉시 조회
+async function getLivePrice(ticker) {
+  const cached = livePrices[ticker];
+  const lastUpdate = priceUpdatedAt ? parseInt(priceUpdatedAt) : 0;
+  if(cached && Date.now() - lastUpdate < 15*60*1000) return cached;
+
+  const result = await fetchLivePrices([ticker]);
+  if(result[ticker]) {
+    livePrices[ticker] = result[ticker];
+    PRICES[ticker] = result[ticker].price;
+    localStorage.setItem('ir_live_prices', JSON.stringify(livePrices));
+    return result[ticker];
+  }
+  return { price: PRICES[ticker]||0, change:0, changePct:0 };
+}
+
+// ── 현재가 포맷
+function fmtPrice(ticker) {
+  const live = livePrices[ticker];
+  const price = live?.price || PRICES[ticker] || 0;
+  const change = live?.changePct || 0;
+  const arrow = change > 0 ? '▲' : change < 0 ? '▼' : '';
+  const color = change > 0 ? '#4ade80' : change < 0 ? '#f87171' : '#889';
+  return {price, change, arrow, color, isLive: !!live};
+}
+
 // 매입 시뮬 계산
 function calcBuy(ticker, dropPct, budget) {
   const price = PRICES[ticker] || 100;
@@ -911,7 +997,221 @@ function initNotifPermission(){
   }
 }
 
-// ── 시그널 등급
+// ── 시그널 상세 팝업 (기회점수 45↑ 시 자동 표시)
+async function showSignalDetail(fig, article, sectors, tickers, score) {
+  // 관련 패턴 찾기
+  const pat = PATTERNS[fig.id];
+  const relPattern = pat?.signaturePatterns?.find(p =>
+    sectors.some(s => p.signal?.toLowerCase().includes(s.toLowerCase())) ||
+    (article.titleOrig||article.title||'').toLowerCase().split(' ').some(w =>
+      w.length>3 && p.description?.toLowerCase().includes(w))
+  ) || pat?.signaturePatterns?.[0];
+
+  // 실시간 현재가
+  const tickerList = tickers ? tickers.split('·') : [];
+  const priceData = {};
+  for(const t of tickerList.slice(0,3)) {
+    priceData[t] = await getLivePrice(t);
+  }
+
+  // 예상 급락가 계산
+  const avgDrop = relPattern?.avgDropPct || 10;
+  const recoveryDays = relPattern?.avgRecoveryDays || 7;
+  const action = relPattern?.actionOnDetect || '분할매수 검토';
+  const patternName = relPattern?.name || '발언 영향 패턴';
+
+  // 매수 시기
+  const buyTiming = recoveryDays === 0
+    ? '⚡ 즉시 진입 검토'
+    : recoveryDays <= 3
+    ? `⚡ 발언 당일 ~ ${recoveryDays}일 내`
+    : `📅 발언 후 1~${Math.round(recoveryDays/2)}일 내 분할매수`;
+
+  // 매도 시기
+  const sellTiming = recoveryDays === 0
+    ? '🚫 진입 금지 또는 당일 청산'
+    : recoveryDays <= 7
+    ? `🎯 ${recoveryDays}일 내 완화 발표 시 청산`
+    : `🎯 ${recoveryDays}일 내 원복 확인 후 청산`;
+
+  // 팝업 생성
+  document.getElementById('signal-detail-popup')?.remove();
+  const popup = document.createElement('div');
+  popup.id = 'signal-detail-popup';
+  popup.style.cssText = `
+    position:fixed;inset:0;z-index:9999;
+    background:rgba(0,0,0,0.85);display:flex;
+    align-items:center;justify-content:center;padding:16px;`;
+
+  const lv = SIGNAL_LEVELS[score>=70?'CRITICAL':score>=45?'HIGH':'MEDIUM'];
+
+  popup.innerHTML = `
+    <div style="background:#08081c;border:2px solid ${lv.color}55;border-radius:8px;
+      width:100%;max-width:480px;max-height:90vh;overflow-y:auto;
+      box-shadow:0 0 40px ${lv.color}33;">
+
+      <!-- 헤더 -->
+      <div style="background:${lv.bg};border-bottom:1px solid ${lv.color}33;
+        padding:14px 16px;display:flex;align-items:center;gap:10px;border-radius:6px 6px 0 0">
+        <span style="font-size:24px">${lv.emoji}</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:bold;color:${lv.color};font-family:var(--mono)">${lv.label} — 기회점수 ${score}</div>
+          <div style="font-size:10px;color:#889;margin-top:2px;font-family:sans-serif">${fig.name} · ${new Date().toLocaleString('ko-KR')}</div>
+        </div>
+        <button onclick="document.getElementById('signal-detail-popup').remove()"
+          style="background:none;border:none;color:#666;font-size:22px;cursor:pointer;padding:0">✕</button>
+      </div>
+
+      <div style="padding:16px">
+
+        <!-- 발생 원인 -->
+        <div style="margin-bottom:14px">
+          <div style="font-size:10px;color:#446;font-family:var(--mono);margin-bottom:6px;letter-spacing:1px">📌 신호 발생 원인</div>
+          <div style="padding:10px 12px;background:#0a0a1e;border-radius:4px;border-left:3px solid ${fig.color}">
+            <div style="font-size:11px;color:#eeeeff;font-family:sans-serif;line-height:1.6;margin-bottom:6px">
+              ${article.title}
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+              <span style="font-size:9px;padding:2px 8px;background:${fig.color}15;
+                color:${fig.color};border:1px solid ${fig.color}33;border-radius:2px">
+                ${fig.name}
+              </span>
+              ${sectors.map(s=>{
+                const sd=SM[s]; if(!sd) return '';
+                return `<span style="font-size:9px;padding:2px 8px;background:${sd.color}15;
+                  color:${sd.color};border:1px solid ${sd.color}33;border-radius:2px">${sd.label}</span>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+
+        <!-- 패턴 분석 -->
+        ${relPattern?`
+        <div style="margin-bottom:14px">
+          <div style="font-size:10px;color:#446;font-family:var(--mono);margin-bottom:6px;letter-spacing:1px">🔍 패턴 분석</div>
+          <div style="padding:10px 12px;background:#0a0a1e;border-radius:4px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span style="font-size:11px;font-weight:bold;color:#fbbf24;font-family:sans-serif">${patternName}</span>
+              <span style="font-size:9px;padding:1px 6px;background:#fbbf2415;
+                color:#fbbf24;border:1px solid #fbbf2433;border-radius:2px">
+                신뢰도 ${pat?.patternScore||80}%
+              </span>
+            </div>
+            <div style="font-size:10px;color:#889;font-family:sans-serif;line-height:1.6">${relPattern.description}</div>
+            <div style="margin-top:6px;font-size:10px;color:#4a9eff;font-family:sans-serif">
+              💡 ${relPattern.signal}
+            </div>
+          </div>
+        </div>`:''}
+
+        <!-- 영향 종목 + 예상 매입가 -->
+        ${tickerList.length>0?`
+        <div style="margin-bottom:14px">
+          <div style="font-size:10px;color:#446;font-family:var(--mono);margin-bottom:6px;letter-spacing:1px">💰 예상 매입가 (급락 ${avgDrop}% 기준)</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${tickerList.slice(0,3).map(t=>{
+              const pd = priceData[t] || {price: PRICES[t]||0, change:0, changePct:0};
+              const curPrice = pd.price;
+              const dropPrice = Math.round(curPrice*(1-avgDrop/100)*100)/100;
+              const isLive = !!livePrices[t];
+              return `
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+                background:#0d1a3a;border:1px solid #4a9eff22;border-radius:4px">
+                <div style="min-width:50px">
+                  <div style="font-size:14px;font-weight:bold;color:#4a9eff;font-family:var(--mono)">${t}</div>
+                  <div style="font-size:8px;color:${isLive?'#4ade80':'#446'};margin-top:1px">
+                    ${isLive?'실시간':'추정'}
+                  </div>
+                </div>
+                <div style="flex:1">
+                  <div style="display:flex;gap:6px;align-items:center;margin-bottom:3px">
+                    <span style="font-size:9px;color:#556">현재가</span>
+                    <span style="font-size:12px;font-weight:bold;color:#eeeeff;font-family:var(--mono)">${fmtUSD(curPrice)}</span>
+                    ${pd.changePct?`<span style="font-size:9px;color:${pd.changePct>0?'#4ade80':'#f87171'}">${pd.changePct>0?'▲':'▼'}${Math.abs(pd.changePct)}%</span>`:''}
+                  </div>
+                  <div style="display:flex;gap:6px;align-items:center">
+                    <span style="font-size:9px;color:#556">목표매입</span>
+                    <span style="font-size:13px;font-weight:bold;color:#fbbf24;font-family:var(--mono)">${fmtUSD(dropPrice)}</span>
+                    <span style="font-size:9px;color:#f87171">▼${avgDrop}%</span>
+                  </div>
+                </div>
+                <div style="text-align:center">
+                  <div style="font-size:8px;color:#446;margin-bottom:2px">예상수익</div>
+                  <div style="font-size:13px;font-weight:bold;color:#4ade80;font-family:var(--mono)">+${avgDrop}%</div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`:''}
+
+        <!-- 매수·매도 타이밍 -->
+        <div style="margin-bottom:14px">
+          <div style="font-size:10px;color:#446;font-family:var(--mono);margin-bottom:6px;letter-spacing:1px">⏱ 매수·매도 타이밍</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="padding:10px 12px;background:#0a2a1a;border:1px solid #4ade8033;border-radius:4px">
+              <div style="font-size:11px;font-weight:bold;color:#4ade80;margin-bottom:3px">${buyTiming}</div>
+              <div style="font-size:10px;color:#889;font-family:sans-serif">${action}</div>
+            </div>
+            <div style="padding:10px 12px;background:#1a0a0a;border:1px solid #f8717133;border-radius:4px">
+              <div style="font-size:11px;font-weight:bold;color:#f87171;margin-bottom:3px">${sellTiming}</div>
+              <div style="font-size:10px;color:#889;font-family:sans-serif">
+                평균 회복 기간: ${recoveryDays===0?'당일 청산':recoveryDays+'일'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 누적 학습 통계 -->
+        ${learnData.figStats[fig.id]?.totalNews>0?`
+        <div style="margin-bottom:14px">
+          <div style="font-size:10px;color:#446;font-family:var(--mono);margin-bottom:6px;letter-spacing:1px">🧠 누적 학습 데이터</div>
+          <div style="padding:10px 12px;background:#0a0a1e;border-radius:4px;
+            display:flex;gap:16px;flex-wrap:wrap">
+            <div style="text-align:center">
+              <div style="font-size:16px;font-weight:bold;color:#4a9eff;font-family:var(--mono)">${learnData.figStats[fig.id].totalNews}</div>
+              <div style="font-size:8px;color:#446">수집 뉴스</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:16px;font-weight:bold;color:#f87171;font-family:var(--mono)">
+                ${Math.round(learnData.figStats[fig.id].negCount/Math.max(learnData.figStats[fig.id].totalNews,1)*100)}%
+              </div>
+              <div style="font-size:8px;color:#446">부정 비율</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:16px;font-weight:bold;color:#fbbf24;font-family:var(--mono)">
+                +${learnData.patternAdjust[fig.id]||0}
+              </div>
+              <div style="font-size:8px;color:#446">점수 보정</div>
+            </div>
+          </div>
+        </div>`:''}
+
+        <!-- 버튼 -->
+        <div style="display:flex;gap:8px">
+          <button onclick="switchTab('filter',null);document.getElementById('signal-detail-popup').remove()"
+            style="flex:1;padding:10px;border:1px solid #4a9eff;background:#0a1a3a;
+              color:#4a9eff;font-size:11px;cursor:pointer;border-radius:4px;font-family:var(--mono)">
+            📊 기회 필터 보기
+          </button>
+          <button onclick="switchTab('log',null);document.getElementById('signal-detail-popup').remove()"
+            style="flex:1;padding:10px;border:1px solid #4ade80;background:#0a1a0a;
+              color:#4ade80;font-size:11px;cursor:pointer;border-radius:4px;font-family:var(--mono)">
+            📝 발언 로그 기록
+          </button>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  // 배경 클릭 시 닫기
+  popup.addEventListener('click', e => {
+    if(e.target === popup) popup.remove();
+  });
+
+  document.body.appendChild(popup);
+}
+
 const SIGNAL_LEVELS = {
   CRITICAL:{emoji:'🔴',label:'즉시포착',color:'#ff4444',bg:'#1a0505',border:'#ff444466',vibrate:[200,100,200,100,200]},
   HIGH:    {emoji:'🟠',label:'유망 시그널',color:'#ff8c00',bg:'#140a00',border:'#ff8c0044',vibrate:[200,100,200]},
@@ -1328,6 +1628,13 @@ async function processArticles(fig, articles, apiName) {
       showSignalBanner(lvl, titleKO.slice(0,50), `${fig.name} · ${art.source?.name||apiName}`, topTickers);
       if(navigator.vibrate) navigator.vibrate(lv.vibrate);
     }
+
+    // 기회점수 45↑ 시 상세 팝업 자동 표시
+    if(maxScore>=45 && !alert.isDemo) {
+      setTimeout(()=>{
+        showSignalDetail(fig, alert, affectedSectors, topTickers, maxScore);
+      }, 1000);
+    }
   }
   return count;
 }
@@ -1617,7 +1924,13 @@ function renderStocks(){
           <span style="font-size:10px;color:#334;font-family:var(--mono)">${i+1}</span>
           <div>
             <div style="font-size:13px;font-weight:bold;color:${oppBorder(s.os)};font-family:var(--mono)">${s.t}</div>
-            <div style="font-size:8px;color:#556;font-family:var(--mono)">${fmtUSD(b.price)}</div>
+            <div style="font-size:8px;font-family:var(--mono)">
+              ${(()=>{
+                const lp = fmtPrice(s.t);
+                return `<span style="color:${lp.isLive?'#eeeeff':'#556'}">${fmtUSD(lp.price)}</span>`
+                  + (lp.isLive ? `<span style="color:${lp.color};font-size:7px;margin-left:2px">${lp.arrow}${Math.abs(lp.change)}%</span>` : ' <span style="color:#334;font-size:7px">추정</span>');
+              })()}
+            </div>
           </div>
           <div>
             <div style="font-size:10px;color:#aab;font-family:sans-serif">${s.n}</div>
@@ -1743,7 +2056,13 @@ function renderFilter(){
           <div style="min-width:55px">
             <div style="font-size:14px;font-weight:bold;color:${oppBorder(s.os)};font-family:var(--mono)">${s.t}</div>
             <div style="font-size:8px;color:#446">${s.type} · ${s.secLabel}</div>
-            <div style="font-size:8px;color:#556;font-family:var(--mono);margin-top:1px">${fmtUSD(PRICES[s.t]||0)}</div>
+            <div style="font-size:8px;font-family:var(--mono);margin-top:1px">
+              ${(()=>{
+                const lp = fmtPrice(s.t);
+                return `<span style="color:${lp.isLive?'#eeeeff':'#556'}">${fmtUSD(lp.price)}</span>`
+                  + (lp.isLive && lp.change!==0 ? `<span style="color:${lp.color};font-size:7px;margin-left:3px">${lp.arrow}${Math.abs(lp.change)}%</span>` : '');
+              })()}
+            </div>
           </div>
           <div style="flex:1">
             <div style="font-size:11px;color:#aab;font-family:sans-serif">${s.n}</div>
@@ -2032,8 +2351,19 @@ function renderSim(){
 }
 
 function testAlert(figName, sectorLabel, drop){
-  pushNotif(`📡 시뮬 알림: ${figName}`, `${sectorLabel} 관련 부정 발언 가정 — 예상 순수하락 -${drop}%`);
-  alert(`✅ 알림 발송 완료!\n\n상단 🔔 아이콘에서 확인하세요.\n모바일에서 알림 ON 시 푸시 알림도 도착합니다.`);
+  const fig = state.figs.find(f=>f.name===figName) || state.figs[0];
+  const score = 65;
+  const mockAlert = {
+    title: `[테스트] ${fig.name} ${sectorLabel} 관련 부정 발언`,
+    titleOrig: `[Test] ${fig.name} ${sectorLabel} negative statement`,
+  };
+  pushNotif(`📡 시뮬: ${figName}`, `${sectorLabel} 관련 부정 발언 — 예상 순수하락 -${drop}%`, score, '');
+  // 상세 팝업도 표시
+  const sectors = Object.keys(SM).filter(k=>SM[k].label===sectorLabel).slice(0,2);
+  const tickers = sectors.flatMap(s=>SM[s]?.d?.slice(0,2).map(d=>d.t)||[]).slice(0,3).join('·');
+  setTimeout(()=>{
+    showSignalDetail(fig, mockAlert, sectors, tickers, score);
+  }, 500);
 }
 
 // ═══════════════════════════════════════
@@ -2669,6 +2999,18 @@ window.onload = function(){
       window.fbInitFCM();
     }
   }, 4000);
+
+  // 실시간 현재가 업데이트 (15분마다)
+  updateAllPrices().then(()=>{
+    if(state.currentTab==='filter') renderFilter();
+    if(state.currentTab==='stocks') renderStocks();
+  });
+  setInterval(()=>{
+    updateAllPrices().then(()=>{
+      if(state.currentTab==='filter') renderFilter();
+      if(state.currentTab==='stocks') renderStocks();
+    });
+  }, 15*60*1000);
 
   updateClock();
   setInterval(updateClock, 10000);
