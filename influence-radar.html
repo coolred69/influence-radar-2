@@ -297,8 +297,8 @@ console.log('✅ Firebase 연결 완료');
     종목 분석
   </button>
   <button class="nav-btn" onclick="switchTab('filter',this)">
-    <svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-    기회 필터
+    <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    종목 발굴
   </button>
   <button class="nav-btn" onclick="switchTab('log',this)">
     <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -2536,92 +2536,193 @@ function selSector(s){
 // RENDER: FILTER
 // ═══════════════════════════════════════
 function renderFilter(){
-  const fig = getSortedFigs().find(f=>f.id===state.simFigId)||getSortedFigs()[0];
-  const allStocks = Object.entries(SM).flatMap(([sec,sd])=>[
-    ...sd.d.map(s=>({...s,secLabel:sd.label,type:'직접'})),
-    ...sd.i.map(s=>({...s,secLabel:sd.label,type:'간접'})),
-  ]);
-  const seen={};
-  const unique = allStocks.filter(s=>{ if(seen[s.t]) return false; seen[s.t]=1; return true; });
-  const result = unique.filter(s=>s.f>=state.fundMin)
-    .map(s=>({...s,os:opp(fig.inf,s.f,state.simDrop)}))
-    .sort((a,b)=>b.os-a.os);
+  const recs = generateRecommendations();
+  const ss = learnData.studyStats||{};
+  if(!learnData.studyStats) learnData.studyStats={totalPredictions:0,totalHits:0,totalCases:0,avgPredError:0,avgTimingError:0,figAccuracy:{},sectorAccuracy:{},probCalibration:0};
+
+  // 학습 기반 전체 종목 점수 계산
+  const tickerData = {};
+  signalLog.forEach(a=>{
+    const tickers = (a.tickers||a.topTickers||'').split('·').filter(Boolean);
+    const acc = a.prediction ? calcSignalAccuracy(a) : null;
+    tickers.forEach(t=>{
+      if(!tickerData[t]) tickerData[t]={
+        ticker:t, signals:[], hitCount:0, totalCount:0,
+        avgActualDrop:null, drops:[], avgScore:0, scores:[],
+        figIds:new Set(), sectors:new Set(),
+      };
+      const d = tickerData[t];
+      d.signals.push(a);
+      d.scores.push(a.score||a.maxScore||0);
+      if(a.figureId) d.figIds.add(a.figureId);
+      (a.sectors||[]).forEach(s=>d.sectors.add(s));
+      if(acc?.isPast&&!acc.noData){
+        const r = acc.results?.find(r=>r.t===t);
+        if(r){
+          d.totalCount++;
+          if(r.hit) d.hitCount++;
+          d.drops.push(r.actualChange);
+        }
+      }
+    });
+  });
+
+  // 수익 추적 데이터 결합
+  (state.trades||[]).forEach(tr=>{
+    if(!tickerData[tr.ticker]) tickerData[tr.ticker]={
+      ticker:tr.ticker,signals:[],hitCount:0,totalCount:0,
+      avgActualDrop:null,drops:[],scores:[],figIds:new Set(),sectors:new Set()
+    };
+    if(!tickerData[tr.ticker].trades) tickerData[tr.ticker].trades=[];
+    tickerData[tr.ticker].trades.push(tr);
+  });
+
+  // 최종 점수 계산
+  const ranked = Object.values(tickerData).map(d=>{
+    const hitRate = d.totalCount>0 ? Math.round(d.hitCount/d.totalCount*100) : null;
+    const avgScore = d.scores.length>0 ? Math.round(d.scores.reduce((s,v)=>s+v,0)/d.scores.length) : 0;
+    const avgDrop = d.drops.length>0 ? Math.round(d.drops.reduce((s,v)=>s+v,0)/d.drops.length*10)/10 : null;
+    const tradePnl = (d.trades||[]).filter(t=>t.status==='closed').reduce((s,t)=>s+(t.pnl||0),0);
+    const openTrades = (d.trades||[]).filter(t=>t.status==='open').length;
+    // 학습 점수 = 빈도×25 + 기회점수×35 + 적중률×30 + 수익×10
+    const freq = d.signals.length;
+    const learnScore = Math.round(
+      Math.min(freq/Math.max(signalLog.length,1)*100,100)*0.25 +
+      (avgScore/100)*0.35*100 +
+      (hitRate||50)*0.30 +
+      (tradePnl>0?Math.min(tradePnl/1000*10,10):0)
+    );
+    const allS = Object.values(SM).flatMap(sv=>[...sv.d,...sv.i]);
+    const stockInfo = allS.find(s=>s.t===d.ticker);
+    return {...d, hitRate, avgScore, avgDrop, tradePnl, openTrades, learnScore, stockInfo};
+  }).sort((a,b)=>b.learnScore-a.learnScore);
+
+  // 현재 활성 시그널 (최근 48시간)
+  const activeSignals = signalLog.filter(a=>{
+    const age = Date.now()-a.id;
+    return age < 48*60*60*1000;
+  });
 
   document.getElementById('tab-filter').innerHTML = `
-    <div class="sec">기회 점수 필터</div>
-    
-    ${budgetInput('renderFilter()')}
+    <div class="sec">학습 기반 종목 발굴</div>
 
-    <div style="background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:14px;margin-bottom:14px">
-      <div style="margin-bottom:12px">
-        <label>기준 인물</label>
-        <select onchange="state.simFigId=+this.value;renderFilter()">
-          ${getSortedFigs().map(f=>`<option value="${f.id}" ${f.id===state.simFigId?'selected':''}>${f.name} (${f.inf}점)</option>`).join('')}
-        </select>
+    <!-- 데이터 없을 때 -->
+    ${ranked.length===0?`
+    <div style="text-align:center;padding:50px 20px;color:#446;font-family:sans-serif">
+      <div style="font-size:36px;margin-bottom:12px">🧠</div>
+      <div style="font-size:12px;margin-bottom:8px">아직 학습 데이터 없음</div>
+      <div style="font-size:10px;color:#334;line-height:1.8">
+        시그널 발생 → 예측 기일 경과 → 결과 자동 기록<br>
+        데이터가 쌓일수록 정확한 종목 발굴이 가능합니다
       </div>
-      <div style="margin-bottom:12px">
-        <label>펀더멘털 최소: <span style="color:#4a9eff">${state.fundMin}점</span> 이상만</label>
-        <input type="range" min="0" max="100" value="${state.fundMin}" 
-          oninput="state.fundMin=+this.value;this.previousElementSibling.querySelector('span').textContent=this.value+'점';renderFilter()" 
-          style="accent-color:#4a9eff">
-      </div>
-      <div>
-        <label>가정 하락폭: <span style="color:#ff8c00">-${state.simDrop}%</span></label>
-        <input type="range" min="5" max="40" value="${state.simDrop}" 
-          oninput="state.simDrop=+this.value;this.previousElementSibling.querySelector('span').textContent='-'+this.value+'%';renderFilter()" 
-          style="accent-color:#ff8c00">
-      </div>
-    </div>
+    </div>`:''}
 
-    <div style="font-size:10px;color:#4a9eff;margin-bottom:10px">${result.length}종목 통과</div>
+    <!-- 활성 시그널 있을 때 상단 하이라이트 -->
+    ${activeSignals.length>0?`
+    <div style="padding:12px 14px;background:#1a0505;border:2px solid #ff444444;
+      border-radius:6px;margin-bottom:14px">
+      <div style="font-size:10px;color:#ff4444;font-family:var(--mono);margin-bottom:8px">
+        ⚡ 현재 활성 시그널 — 최근 48시간
+      </div>
+      ${activeSignals.slice(0,3).map(a=>{
+        const sc=a.score||a.maxScore||0;
+        const lv=SIGNAL_LEVELS[getSignalLevel(sc)];
+        const tk=a.tickers||a.topTickers||'';
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          <span style="font-size:14px">${lv.emoji}</span>
+          <span style="font-size:11px;color:#eeeeff;flex:1;font-family:sans-serif">${a.title?.slice(0,45)||''}</span>
+          ${tk?tk.split('·').slice(0,2).map(t=>`<span style="font-size:9px;padding:1px 6px;
+            background:#0a1a3a;border:1px solid #4a9eff44;color:#4a9eff;
+            border-radius:2px;font-family:var(--mono)">${t}</span>`).join(''):''}
+        </div>`;
+      }).join('')}
+    </div>`:''}
 
-    ${result.length===0?`<div style="text-align:center;padding:30px;color:#334;font-size:12px">조건에 맞는 종목 없음</div>`:''}
-    ${result.map(s=>`
-      <div class="card card-border-l" style="border-left-color:${oppBorder(s.os)};
-        background:${s.os>=70?'#1a0808':s.os>=45?'#120c04':'var(--panel)'}">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="min-width:55px">
-            <div style="font-size:14px;font-weight:bold;color:${oppBorder(s.os)};font-family:var(--mono)">${s.t}</div>
-            <div style="font-size:8px;color:#446">${s.type} · ${s.secLabel}</div>
-            <div style="font-size:8px;font-family:var(--mono);margin-top:1px">
-              ${(()=>{
-                const lp = fmtPrice(s.t);
-                return `<span style="color:${lp.isLive?'#eeeeff':'#556'}">${fmtUSD(lp.price)}</span>`
-                  + (lp.isLive && lp.change!==0 ? `<span style="color:${lp.color};font-size:7px;margin-left:3px">${lp.arrow}${Math.abs(lp.change)}%</span>` : '');
-              })()}
+    <!-- 학습 종목 랭킹 -->
+    ${ranked.map((d,i)=>{
+      const lp = fmtPrice(d.ticker);
+      const sc = d.learnScore;
+      const scColor = sc>=70?'#4ade80':sc>=50?'#fbbf24':'#889';
+      const hrColor = d.hitRate>=70?'#4ade80':d.hitRate>=40?'#fbbf24':'#f87171';
+      const figs = [...(d.figIds||[])].map(id=>state.figs.find(f=>f.id===id)).filter(Boolean);
+      return `
+      <div style="padding:13px 14px;background:#08081c;
+        border:1px solid ${sc>=70?'#4ade8033':sc>=50?'#fbbf2422':'#1a1a4a'};
+        border-left:4px solid ${scColor};border-radius:4px;margin-bottom:8px">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <!-- 순위 + 티커 -->
+          <div style="min-width:60px">
+            <div style="font-size:9px;color:#334;font-family:var(--mono)">#${i+1}</div>
+            <div style="font-size:20px;font-weight:bold;color:#4a9eff;font-family:var(--mono);line-height:1.1">${d.ticker}</div>
+            <div style="font-size:9px;color:#446;margin-top:2px">${d.stockInfo?.secLabel||''}</div>
+          </div>
+          <!-- 종목명 + 현재가 -->
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;color:#aab;font-family:sans-serif;margin-bottom:5px">
+              ${d.stockInfo?.n||d.ticker}
+            </div>
+            <!-- 현재가 -->
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+              <span style="font-size:14px;font-weight:bold;color:${lp.isLive?'#eeeeff':'#556'};font-family:var(--mono)">${fmtUSD(lp.price)}</span>
+              ${lp.isLive&&lp.change!==0?`<span style="font-size:10px;color:${lp.color}">${lp.arrow}${Math.abs(lp.change)}%</span>`:''}
+              ${lp.isLive?'<span style="font-size:8px;color:#4ade80">실시간</span>':'<span style="font-size:8px;color:#334">추정</span>'}
+            </div>
+            <!-- 통계 뱃지 -->
+            <div style="display:flex;gap:5px;flex-wrap:wrap">
+              <span style="font-size:9px;padding:2px 7px;background:#0a0a1e;
+                border:1px solid #1a1a4a;color:#556;border-radius:2px">
+                시그널 ${d.signals.length}회
+              </span>
+              ${d.hitRate!==null?`<span style="font-size:9px;padding:2px 7px;
+                background:${hrColor}15;border:1px solid ${hrColor}44;
+                color:${hrColor};border-radius:2px">
+                적중 ${d.hitRate}% (${d.hitCount}/${d.totalCount})
+              </span>`:''}
+              ${d.avgDrop!==null?`<span style="font-size:9px;padding:2px 7px;
+                background:#f8717115;border:1px solid #f8717133;
+                color:#f87171;border-radius:2px">
+                평균 ${d.avgDrop}%
+              </span>`:''}
+              ${d.tradePnl!==0?`<span style="font-size:9px;padding:2px 7px;
+                background:${d.tradePnl>0?'#4ade8015':'#f8717115'};
+                border:1px solid ${d.tradePnl>0?'#4ade8033':'#f8717133'};
+                color:${d.tradePnl>0?'#4ade80':'#f87171'};border-radius:2px">
+                ${d.tradePnl>0?'+':''}${fmtUSD(Math.round(d.tradePnl))}
+              </span>`:''}
+              ${d.openTrades>0?`<span style="font-size:9px;padding:2px 7px;
+                background:#4a9eff15;border:1px solid #4a9eff33;
+                color:#4a9eff;border-radius:2px">보유 ${d.openTrades}건</span>`:''}
             </div>
           </div>
-          <div style="flex:1">
-            <div style="font-size:11px;color:#aab;font-family:sans-serif">${s.n}</div>
-            <div style="font-size:9px;color:#556;font-family:sans-serif">${s.note}</div>
-            <div style="display:flex;align-items:center;gap:6px;margin-top:5px">
-              ${bar(s.f,s.f>=70?'#4ade80':s.f>=50?'#fbbf24':'#ef4444',50)}
-              <span style="font-size:9px;color:#aab;font-family:var(--mono)">${s.f}</span>
-            </div>
-          </div>
-          <div style="text-align:center">
-            <div class="${oppClass(s.os)}" style="font-size:22px;font-weight:bold;font-family:var(--mono)">${s.os}</div>
-            <div style="font-size:8px;color:#446">${oppLabel(s.os)}</div>
+          <!-- 학습 점수 -->
+          <div style="text-align:center;flex-shrink:0">
+            <div style="font-size:24px;font-weight:bold;color:${scColor};font-family:var(--mono);line-height:1">${sc}</div>
+            <div style="font-size:7px;color:#446;margin-top:2px">학습 점수</div>
           </div>
         </div>
-        ${state.budget>0 ? buyCalcCard(s.t, state.simDrop) : ''}
-      </div>`).join('')}
-
-    <div class="card" style="margin-top:16px">
-      <div class="sec">공식</div>
-      <div style="font-size:11px;color:#889">기회점수 = (영향력/100) × (펀더멘털/100) × 하락폭 × 10</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
-        ${[['🔴 즉시포착','70↑'],['🟠 유망','45~69'],['🟡 관찰','25~44'],['⚫ 제외','25↓']].map(([l,r])=>
-          `<span style="font-size:9px;color:#667">${l} <span style="color:#aab">${r}</span></span>`
-        ).join('')}
-      </div>
-    </div>
+        <!-- 관련 인물 -->
+        ${figs.length>0?`
+        <div style="display:flex;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid #12123a">
+          <span style="font-size:9px;color:#446;flex-shrink:0;padding-top:2px">연관 인물</span>
+          ${figs.slice(0,3).map(f=>`
+            <div style="display:flex;align-items:center;gap:4px;padding:2px 7px;
+              background:${f.color}0d;border:1px solid ${f.color}33;border-radius:2px">
+              <span style="font-size:8px;color:${f.color};font-weight:bold">${f.avatar}</span>
+              <span style="font-size:9px;color:${f.color}">${f.name.split(' ')[0]}</span>
+            </div>`).join('')}
+          <button onclick="switchTab('trade',null)"
+            style="margin-left:auto;font-size:9px;padding:2px 8px;
+              border:1px solid #4ade8033;background:transparent;color:#4ade80;
+              cursor:pointer;border-radius:2px;font-family:var(--mono)">
+            + 진입 기록
+          </button>
+        </div>`:''}
+      </div>`;
+    }).join('')}
   `;
 }
 
-// ═══════════════════════════════════════
-// RENDER: LOG
-// ═══════════════════════════════════════
+
 function renderLog(){
   document.getElementById('tab-log').innerHTML = `
     ${renderManualSignalForm()}
