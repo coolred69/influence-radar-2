@@ -1021,6 +1021,54 @@ async function showSignalDetail(fig, article, sectors, tickers, score) {
   const action = relPattern?.actionOnDetect || '분할매수 검토';
   const patternName = relPattern?.name || '발언 영향 패턴';
 
+  // ── 예상 확률 계산 (우리 계산법)
+  const patTrust = (pat?.patternScore||70) / 100;          // 패턴 신뢰도 (0~1)
+  const figInfl  = fig.inf / 100;                           // 영향력 점수 (0~1)
+  const fundAvg  = tickerList.length>0
+    ? tickerList.reduce((sum,t)=>{
+        const allS = Object.values(SM).flatMap(sv=>[...sv.d,...sv.i]);
+        const found = allS.find(s=>s.t===t);
+        return sum + (found?.f||50);
+      },0) / tickerList.length / 100
+    : 0.6;                                                   // 펀더멘털 평균 (0~1)
+  const learnBonus = learnData.figStats[fig.id]
+    ? Math.min(0.1, learnData.figStats[fig.id].negCount /
+        Math.max(learnData.figStats[fig.id].totalNews,1) * 0.1)
+    : 0;                                                     // 누적 학습 보정
+
+  // 가중 확률 = 패턴×40% + 영향력×30% + 펀더멘털×20% + 학습×10%
+  const rawProb = (patTrust*0.4) + (figInfl*0.3) + (fundAvg*0.2) + (learnBonus*0.1);
+  const prob = Math.round(Math.min(98, Math.max(30, rawProb*100)));
+  const probColor = prob>=75?'#4ade80':prob>=55?'#fbbf24':'#f87171';
+  const probLabel = prob>=75?'높음':prob>=55?'보통':'낮음';
+
+  // 예상 기일
+  const expectedDate = new Date(Date.now() + recoveryDays*24*60*60*1000);
+  const expectedDateStr = expectedDate.toLocaleDateString('ko-KR',{month:'short',day:'numeric'});
+
+  // 알림 객체에 예측 데이터 저장 (정확도 추적용)
+  const signalId = article.id || Date.now();
+  const prediction = {
+    id: signalId,
+    figureId: fig.id,
+    figureName: fig.name,
+    tickers: tickerList,
+    avgDrop, recoveryDays,
+    expectedDate: expectedDate.toISOString(),
+    prob,
+    priceAtSignal: {},
+    patternName,
+  };
+  tickerList.forEach(t=>{
+    if(priceData[t]) prediction.priceAtSignal[t] = priceData[t].price;
+  });
+  // state.alerts에서 해당 알림 찾아서 예측 데이터 저장
+  const alertIdx = state.alerts.findIndex(a=>a.id===signalId||(a.title===article.title&&!a.prediction));
+  if(alertIdx>=0 && !state.alerts[alertIdx].prediction) {
+    state.alerts[alertIdx].prediction = prediction;
+    save();
+  }
+
   // 매수 시기
   const buyTiming = recoveryDays === 0
     ? '⚡ 즉시 진입 검토'
@@ -1065,6 +1113,50 @@ async function showSignalDetail(fig, article, sectors, tickers, score) {
       </div>
 
       <div style="padding:16px">
+
+        <!-- 예상 확률 -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+          <div style="padding:10px;background:#0a0a1e;border-radius:4px;text-align:center;
+            border:1px solid ${probColor}44">
+            <div style="font-size:26px;font-weight:bold;color:${probColor};
+              font-family:var(--mono);line-height:1">${prob}%</div>
+            <div style="font-size:9px;color:${probColor};margin-top:3px">예상 확률 · ${probLabel}</div>
+          </div>
+          <div style="padding:10px;background:#0a0a1e;border-radius:4px;text-align:center;
+            border:1px solid #1a1a4a">
+            <div style="font-size:18px;font-weight:bold;color:#fbbf24;font-family:var(--mono)">${avgDrop}%</div>
+            <div style="font-size:9px;color:#446;margin-top:3px">예상 급락폭</div>
+          </div>
+          <div style="padding:10px;background:#0a0a1e;border-radius:4px;text-align:center;
+            border:1px solid #1a1a4a">
+            <div style="font-size:14px;font-weight:bold;color:#4a9eff;font-family:var(--mono)">${expectedDateStr}</div>
+            <div style="font-size:9px;color:#446;margin-top:3px">예상 기일 (${recoveryDays}일)</div>
+          </div>
+        </div>
+
+        <!-- 확률 구성 요소 -->
+        <div style="padding:10px 12px;background:#08081c;border-radius:4px;
+          margin-bottom:14px;border:1px solid #1a1a4a">
+          <div style="font-size:9px;color:#446;margin-bottom:8px;font-family:var(--mono);letter-spacing:1px">
+            📐 확률 계산 근거
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            ${[
+              ['패턴 신뢰도', Math.round(patTrust*100), '#fbbf24', '×40%'],
+              ['영향력 점수', Math.round(figInfl*100), fig.color||'#4a9eff', '×30%'],
+              ['펀더멘털 평균', Math.round(fundAvg*100), '#4ade80', '×20%'],
+              ['누적 학습 보정', Math.round(learnBonus*1000)/10, '#a78bfa', '×10%'],
+            ].map(([label,val,col,weight])=>`
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:9px;color:#556;width:80px;flex-shrink:0">${label}</span>
+                <div style="flex:1;height:4px;background:#1a1a4a;border-radius:2px;overflow:hidden">
+                  <div style="width:${Math.min(val,100)}%;height:100%;background:${col};border-radius:2px"></div>
+                </div>
+                <span style="font-size:9px;color:${col};font-family:var(--mono);width:32px;text-align:right">${val}${label.includes('보정')?'':''}</span>
+                <span style="font-size:8px;color:#334;width:30px">${weight}</span>
+              </div>`).join('')}
+          </div>
+        </div>
 
         <!-- 발생 원인 -->
         <div style="margin-bottom:14px">
@@ -2597,7 +2689,7 @@ function renderSim(){
         </div>
 
         <!-- 섹터 태그 -->
-        ${(a.sectors||[]).length>0?`
+        ${(a.sectors||[]).length>0||a.prediction?`
         <div style="padding:6px 14px 8px;display:flex;gap:5px;flex-wrap:wrap;
           border-top:1px solid ${lv.border}">
           ${(a.sectors||[]).map(s=>{
@@ -2608,6 +2700,81 @@ function renderSim(){
           <span style="font-size:9px;color:#4a9eff;margin-left:auto;cursor:pointer"
             onclick="reopenSignalDetail(${realIdx})">📊 상세 팝업 →</span>
         </div>`:''}
+
+        <!-- 예측 정확도 (예상 기일 경과 시) -->
+        ${(()=>{
+          const pred = a.prediction;
+          if(!pred) return '';
+          const now = new Date();
+          const expDate = new Date(pred.expectedDate);
+          const isPast = now > expDate;
+          const daysLeft = Math.round((expDate-now)/(1000*60*60*24));
+
+          if(!isPast) {
+            // 기일 미도래 — 카운트다운
+            return `<div style="padding:8px 14px;background:#0a0a1e;
+              border-top:1px solid ${lv.border};display:flex;align-items:center;gap:8px">
+              <span style="font-size:9px;color:#446">⏳ 예상 기일까지</span>
+              <span style="font-size:11px;font-weight:bold;color:#4a9eff;font-family:var(--mono)">
+                ${daysLeft<=0?'오늘':daysLeft+'일 남음'}
+              </span>
+              <span style="font-size:9px;color:#334;margin-left:auto">
+                ${expDate.toLocaleDateString('ko-KR',{month:'short',day:'numeric'})}
+              </span>
+              ${pred.prob?`<span style="font-size:10px;font-weight:bold;color:${pred.prob>=75?'#4ade80':pred.prob>=55?'#fbbf24':'#f87171'};font-family:var(--mono)">
+                예상확률 ${pred.prob}%
+              </span>`:''}
+            </div>`;
+          }
+
+          // 기일 경과 — 실제 결과와 비교
+          const resultHtml = pred.tickers?.length>0 ? (()=>{
+            const results = pred.tickers.map(t=>{
+              const signalPrice = pred.priceAtSignal?.[t]||PRICES[t]||0;
+              const currentPrice = livePrices[t]?.price||PRICES[t]||0;
+              if(!signalPrice||!currentPrice) return null;
+              const actualChange = Math.round((currentPrice-signalPrice)/signalPrice*1000)/10;
+              const predicted = -(pred.avgDrop||10);
+              const hit = Math.abs(actualChange-predicted)<=predicted*0.5; // 50% 오차 내면 적중
+              return {t, signalPrice, currentPrice, actualChange, predicted, hit};
+            }).filter(Boolean);
+
+            if(!results.length) return '';
+            const hitCount = results.filter(r=>r.hit).length;
+            const hitRate = Math.round(hitCount/results.length*100);
+            const hitColor = hitRate>=70?'#4ade80':hitRate>=40?'#fbbf24':'#f87171';
+
+            return `<div style="padding:10px 14px;background:#0a0a1e;border-top:1px solid ${lv.border}">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                <span style="font-size:10px;color:#446">📊 예측 결과</span>
+                <span style="font-size:13px;font-weight:bold;color:${hitColor};font-family:var(--mono)">
+                  적중률 ${hitRate}%
+                </span>
+                <span style="font-size:9px;color:#334">(${hitCount}/${results.length})</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:5px">
+                ${results.map(r=>`
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:10px;font-weight:bold;color:#4a9eff;
+                      font-family:var(--mono);width:45px">${r.t}</span>
+                    <span style="font-size:9px;color:#446">예상</span>
+                    <span style="font-size:10px;color:#fbbf24;font-family:var(--mono)">${r.predicted}%</span>
+                    <span style="font-size:9px;color:#334">→ 실제</span>
+                    <span style="font-size:10px;font-weight:bold;
+                      color:${r.actualChange<0?'#f87171':'#4ade80'};font-family:var(--mono)">
+                      ${r.actualChange>0?'+':''}${r.actualChange}%
+                    </span>
+                    <span style="font-size:12px;margin-left:auto">${r.hit?'✅':'❌'}</span>
+                  </div>`).join('')}
+              </div>
+            </div>`;
+          })() : '';
+
+          return resultHtml || `<div style="padding:8px 14px;background:#0a0a1e;
+            border-top:1px solid ${lv.border};font-size:9px;color:#446">
+            ⏰ 예상 기일(${expDate.toLocaleDateString('ko-KR',{month:'short',day:'numeric'})}) 경과 — 실제 데이터 수집 중
+          </div>`;
+        })()}
       </div>`;
     }).join('')}
   `;
