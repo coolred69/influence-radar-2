@@ -299,8 +299,8 @@ console.log('✅ Firebase 연결 완료');
     발언 로그
   </button>
   <button class="nav-btn" onclick="switchTab('sim',this)">
-    <svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-    알림 시뮬레이터
+    <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    시그널 기록
   </button>
   <button class="nav-btn" onclick="switchTab('map',this)">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
@@ -2499,93 +2499,121 @@ function saveLog(){
 // RENDER: SIM
 // ═══════════════════════════════════════
 function renderSim(){
-  const fig = getSortedFigs().find(f=>f.id===state.simFigId)||getSortedFigs()[0];
-  const sd = SM[state.simSector];
-  const st = figStats(fig.id);
-  const estDrop = st.avgPureEffect>0?st.avgPureEffect:st.avgDrop>0?st.avgDrop:10;
-  const allS = [...sd.d.map(s=>({...s,type:'직접'})),...sd.i.map(s=>({...s,type:'간접'}))];
-  const result = allS.map(s=>({...s,os:opp(fig.inf,s.f,estDrop)})).sort((a,b)=>b.os-a.os);
+  // 팝업이 떴던 시그널만 필터 (기회점수 45↑, fromAPI)
+  const signals = state.alerts.filter(a=>
+    a.fromAPI && (a.score||a.maxScore||0)>=45
+  ).sort((a,b)=>b.id-a.id);
+
+  const lvCounts = {CRITICAL:0, HIGH:0, MEDIUM:0};
+  signals.forEach(a=>{
+    const sc = a.score||a.maxScore||0;
+    if(sc>=70) lvCounts.CRITICAL++;
+    else if(sc>=45) lvCounts.HIGH++;
+    else lvCounts.MEDIUM++;
+  });
 
   document.getElementById('tab-sim').innerHTML = `
-    <div class="sec">알림 시뮬레이터</div>
-    
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <div><label>가상 발언 인물</label>
-        <select onchange="state.simFigId=+this.value;renderSim()">
-          ${getSortedFigs().map(f=>`<option value="${f.id}" ${f.id===state.simFigId?'selected':''}>${f.name}</option>`).join('')}
-        </select>
+    <div class="sec">시그널 기록 — 팝업 발생 내역</div>
+
+    <!-- 요약 카드 -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+      <div style="padding:10px;background:#1a0505;border:1px solid #ff444433;border-radius:4px;text-align:center">
+        <div style="font-size:22px;font-weight:bold;color:#ff4444;font-family:var(--mono)">${lvCounts.CRITICAL}</div>
+        <div style="font-size:9px;color:#ff4444;margin-top:2px">🔴 즉시포착</div>
       </div>
-      <div><label>타깃 섹터</label>
-        <select onchange="state.simSector=this.value;renderSim()">
-          ${Object.entries(SM).map(([k,v])=>`<option value="${k}" ${k===state.simSector?'selected':''}>${v.label}</option>`).join('')}
-        </select>
+      <div style="padding:10px;background:#140a00;border:1px solid #ff8c0033;border-radius:4px;text-align:center">
+        <div style="font-size:22px;font-weight:bold;color:#ff8c00;font-family:var(--mono)">${lvCounts.HIGH}</div>
+        <div style="font-size:9px;color:#ff8c00;margin-top:2px">🟠 유망 시그널</div>
+      </div>
+      <div style="padding:10px;background:#0f0e00;border:1px solid #fbbf2433;border-radius:4px;text-align:center">
+        <div style="font-size:22px;font-weight:bold;color:#fbbf24;font-family:var(--mono)">${lvCounts.MEDIUM}</div>
+        <div style="font-size:9px;color:#fbbf24;margin-top:2px">🟡 관찰</div>
       </div>
     </div>
 
-    <div class="card card-border-l" style="border-left-color:${fig.color};margin-bottom:14px">
-      <div style="font-size:10px;color:#446;margin-bottom:8px">시나리오</div>
-      <div style="font-size:13px;color:#eeeeff;font-family:sans-serif;line-height:1.7">
-        <span style="color:${fig.color}">${fig.name}</span>이(가)
-        <span style="color:${sd.color}">${sd.label}</span> 관련 <span style="color:#ff4444">부정 발언</span>을 했다면?
-      </div>
-      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px">
-        <span style="font-size:10px;color:#446">영향력 <span style="color:${fig.color}">${fig.inf}pt</span></span>
-        <span style="font-size:10px;color:#446">예상 순수하락 <span style="color:#f87171">-${estDrop}%</span>
-          ${st.hitCount>0?`<span style="color:#446;font-size:8px"> (과거 평균 기반)</span>`:''}</span>
-        <span style="font-size:10px;color:#446">예상 회복 <span style="color:#fbbf24">${st.avgRecovery>0?st.avgRecovery+'일':'데이터 부족'}</span></span>
-      </div>
+    <!-- 필터 -->
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+      ${['전체','🔴 즉시포착','🟠 유망','🟡 관찰'].map((label,i)=>`
+        <button onclick="state.sigFilter=${i};renderSim()"
+          style="font-size:10px;padding:5px 12px;border-radius:3px;cursor:pointer;
+            border:1px solid ${(state.sigFilter||0)===i?'#4a9eff':'#1a1a4a'};
+            background:${(state.sigFilter||0)===i?'#0a1a3a':'transparent'};
+            color:${(state.sigFilter||0)===i?'#4a9eff':'#446'}">${label}</button>
+      `).join('')}
+      <button onclick="state.alerts=state.alerts.filter(a=>!(a.fromAPI&&(a.score||a.maxScore||0)>=45));save();renderSim();updateNotifBadge()"
+        style="font-size:10px;padding:5px 12px;border-radius:3px;cursor:pointer;
+          border:1px solid #334;background:transparent;color:#556;margin-left:auto">
+        전체 삭제
+      </button>
     </div>
 
-    <button class="btn btn-red" style="width:100%;margin-bottom:14px" 
-      onclick="testAlert('${fig.name}','${sd.label}',${estDrop})">
-      📡 지금 이 시나리오로 테스트 알림 발송
-    </button>
+    <!-- 시그널 목록 -->
+    ${signals.length===0?`
+      <div style="text-align:center;padding:40px;color:#446;font-size:12px;font-family:sans-serif">
+        아직 시그널 없음<br>
+        <span style="font-size:10px;color:#334">기회점수 45↑ 시그널 발생 시 자동으로 쌓입니다</span>
+      </div>
+    `:''}
 
-    <div class="sec">영향 예상 종목 (기회점수 순)</div>
-    ${result.map(s=>`
-      <div class="card card-border-l" style="border-left-color:${oppBorder(s.os)};margin-bottom:8px;
-        background:${s.os>=70?'#1a0808':s.os>=45?'#120c04':'var(--panel)'}">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div style="min-width:55px">
-            <div style="font-size:14px;font-weight:bold;color:${oppBorder(s.os)};font-family:var(--mono)">${s.t}</div>
-            ${tag(s.type,s.type==='직접'?sd.color:'#556',true)}
-          </div>
-          <div style="flex:1">
-            <div style="font-size:11px;color:#aab;font-family:sans-serif">${s.n}</div>
-            <div style="font-size:9px;color:#556;font-family:sans-serif">${s.note}</div>
-            <div style="font-size:9px;color:#446;margin-top:3px">
-              예상 하락 <span style="color:#f87171">-${estDrop}%</span>
-              · 회복 <span style="color:#fbbf24">${st.avgRecovery>0?st.avgRecovery+'일':'미상'}</span>
+    ${signals.filter(a=>{
+      const sc = a.score||a.maxScore||0;
+      const f = state.sigFilter||0;
+      if(f===0) return true;
+      if(f===1) return sc>=70;
+      if(f===2) return sc>=45&&sc<70;
+      if(f===3) return sc>=25&&sc<45;
+      return true;
+    }).map((a,idx)=>{
+      const sc = a.score||a.maxScore||0;
+      const lvl = sc>=70?'CRITICAL':sc>=45?'HIGH':'MEDIUM';
+      const lv = SIGNAL_LEVELS[lvl];
+      const tk = a.tickers||a.topTickers||'';
+      const realIdx = state.alerts.indexOf(a);
+      return `
+      <div style="margin-bottom:8px;background:${lv.bg};border:1px solid ${lv.border};
+        border-left:4px solid ${lv.color};border-radius:4px;overflow:hidden">
+
+        <!-- 헤더 -->
+        <div style="padding:10px 14px;display:flex;align-items:flex-start;gap:10px;
+          cursor:pointer" onclick="reopenSignalDetail(${realIdx})">
+          <span style="font-size:18px;flex-shrink:0">${lv.emoji}</span>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
+              <span style="font-size:11px;font-weight:bold;color:${lv.color}">${lv.label}</span>
+              <span style="font-size:12px;font-weight:bold;color:${lv.color};
+                font-family:var(--mono);margin-left:auto">${sc}점</span>
+            </div>
+            <div style="font-size:12px;color:#eeeeff;font-family:sans-serif;
+              line-height:1.5;margin-bottom:5px">${a.title}</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              ${a.figureName?`<span style="font-size:10px;color:${a.figureColor||'#889'}">${a.figureName}</span>`:''}
+              ${tk?tk.split('·').map(t=>`
+                <span style="font-size:9px;padding:2px 7px;background:#0a1a3a;
+                  border:1px solid #4a9eff44;color:#4a9eff;border-radius:2px;
+                  font-family:var(--mono);font-weight:bold">${t}</span>`).join(''):''}
+              <span style="font-size:9px;color:#446;font-family:var(--mono);margin-left:auto">${a.time||''}</span>
             </div>
           </div>
-          <div style="text-align:center;min-width:50px">
-            <div class="${oppClass(s.os)}" style="font-size:20px;font-weight:bold;font-family:var(--mono)">${s.os}</div>
-            <div style="font-size:8px;color:#446">${oppLabel(s.os)}</div>
-          </div>
         </div>
-      </div>`).join('')}
+
+        <!-- 섹터 태그 -->
+        ${(a.sectors||[]).length>0?`
+        <div style="padding:6px 14px 8px;display:flex;gap:5px;flex-wrap:wrap;
+          border-top:1px solid ${lv.border}">
+          ${(a.sectors||[]).map(s=>{
+            const sd=SM[s]; if(!sd) return '';
+            return `<span style="font-size:8px;padding:2px 7px;background:${sd.color}15;
+              color:${sd.color};border:1px solid ${sd.color}33;border-radius:2px">${sd.label}</span>`;
+          }).join('')}
+          <span style="font-size:9px;color:#4a9eff;margin-left:auto;cursor:pointer"
+            onclick="reopenSignalDetail(${realIdx})">📊 상세 팝업 →</span>
+        </div>`:''}
+      </div>`;
+    }).join('')}
   `;
 }
 
-function testAlert(figName, sectorLabel, drop){
-  const fig = state.figs.find(f=>f.name===figName) || state.figs[0];
-  const score = 65;
-  const mockAlert = {
-    title: `[테스트] ${fig.name} ${sectorLabel} 관련 부정 발언`,
-    titleOrig: `[Test] ${fig.name} ${sectorLabel} negative statement`,
-  };
-  pushNotif(`📡 시뮬: ${figName}`, `${sectorLabel} 관련 부정 발언 — 예상 순수하락 -${drop}%`, score, '');
-  // 상세 팝업도 표시
-  const sectors = Object.keys(SM).filter(k=>SM[k].label===sectorLabel).slice(0,2);
-  const tickers = sectors.flatMap(s=>SM[s]?.d?.slice(0,2).map(d=>d.t)||[]).slice(0,3).join('·');
-  setTimeout(()=>{
-    showSignalDetail(fig, mockAlert, sectors, tickers, score);
-  }, 500);
-}
 
-// ═══════════════════════════════════════
-// RENDER: MAP
-// ═══════════════════════════════════════
 function renderMap(){
   const figs = getSortedFigs().filter(f=>f.rel&&f.rel.length>0);
   document.getElementById('tab-map').innerHTML = `
