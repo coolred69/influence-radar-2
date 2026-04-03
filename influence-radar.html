@@ -1040,9 +1040,10 @@ async function showSignalDetail(fig, article, sectors, tickers, score) {
   const popup = document.createElement('div');
   popup.id = 'signal-detail-popup';
   popup.style.cssText = `
-    position:fixed;inset:0;z-index:9999;
-    background:rgba(0,0,0,0.85);display:flex;
-    align-items:center;justify-content:center;padding:16px;`;
+    position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;
+    background:rgba(0,0,0,0.88);display:flex;
+    align-items:flex-start;justify-content:center;
+    padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch;`;
 
   const lv = SIGNAL_LEVELS[score>=70?'CRITICAL':score>=45?'HIGH':'MEDIUM'];
 
@@ -1661,6 +1662,15 @@ async function processArticles(fig, articles, apiName) {
     state.alerts.unshift(alert);
     count++;
 
+    // 인앱 배너 + 진동 — isDemo 관계없이 점수 기준
+    if(maxScore>=25) {
+      const lvl = getSignalLevel(maxScore);
+      const lv = SIGNAL_LEVELS[lvl];
+      showSignalBanner(lvl, titleKO.slice(0,50)||'새 시그널', `${fig.name} · ${art.source?.name||apiName}`, topTickers);
+      if(navigator.vibrate) navigator.vibrate(lv.vibrate);
+    }
+
+    // 푸시 알림 — 실제 뉴스만
     if(maxScore>=25 && notifPermission && !alert.isDemo) {
       const lvl = getSignalLevel(maxScore);
       const lv = SIGNAL_LEVELS[lvl];
@@ -1670,15 +1680,13 @@ async function processArticles(fig, articles, apiName) {
           : titleKO.slice(0,80),
         tag: lvl, requireInteraction: maxScore>=70,
       });
-      showSignalBanner(lvl, titleKO.slice(0,50), `${fig.name} · ${art.source?.name||apiName}`, topTickers);
-      if(navigator.vibrate) navigator.vibrate(lv.vibrate);
     }
 
-    // 기회점수 45↑ 시 상세 팝업 자동 표시
-    if(maxScore>=45 && !alert.isDemo) {
+    // 상세 팝업 — 45점↑ 이면 항상 표시
+    if(maxScore>=45) {
       setTimeout(()=>{
         showSignalDetail(fig, alert, affectedSectors, topTickers, maxScore);
-      }, 1000);
+      }, 800);
     }
   }
   return count;
