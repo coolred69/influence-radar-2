@@ -1303,11 +1303,16 @@ function renderNotifPanel(){
     panel.innerHTML=`<div style="padding:14px 16px;background:#07071a;border-bottom:1px solid #12123a;font-size:11px;color:#446">알림 없음</div>`;
     return;
   }
-  panel.innerHTML = state.alerts.slice(0,15).map(a=>{
+  panel.innerHTML = state.alerts.slice(0,15).map((a,idx)=>{
     const lv = SIGNAL_LEVELS[a.level||'INFO'];
+    const canReopen = a.fromAPI && a.figureId && (a.score||0)>=45;
     return `
-    <div style="padding:10px 14px;background:${lv.bg};border-bottom:1px solid ${lv.border};
-      border-left:3px solid ${lv.color};display:flex;gap:10px;align-items:flex-start">
+    <div onclick="${canReopen?`reopenSignalDetail(${idx})`:'toggleNotif()'}"
+      style="padding:10px 14px;background:${lv.bg};border-bottom:1px solid ${lv.border};
+      border-left:3px solid ${lv.color};display:flex;gap:10px;align-items:flex-start;
+      cursor:${canReopen?'pointer':'default'};
+      ${canReopen?`transition:background .15s;`:''}"
+      ${canReopen?`onmouseover="this.style.filter='brightness(1.3)'" onmouseout="this.style.filter=''"`:''}>
       <span style="font-size:16px;flex-shrink:0">${lv.emoji}</span>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
@@ -1321,10 +1326,29 @@ function renderNotifPanel(){
         </div>
         <div style="color:#eeeeff;font-size:11px;font-family:sans-serif;line-height:1.4">${a.title}</div>
         ${a.body?`<div style="color:#889;font-size:10px;margin-top:2px;font-family:sans-serif">${a.body}</div>`:''}
-        <div style="color:#446;font-size:9px;margin-top:3px">${a.time}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:3px">
+          <span style="color:#446;font-size:9px">${a.time}</span>
+          ${canReopen?`<span style="font-size:9px;color:#4a9eff;font-family:var(--mono)">탭하면 상세보기 →</span>`:''}
+        </div>
       </div>
     </div>`;
   }).join('');
+}
+
+// 알림 패널에서 시그널 상세 팝업 재열기
+async function reopenSignalDetail(idx) {
+  const a = state.alerts[idx];
+  if(!a || !a.figureId) return;
+  const fig = state.figs.find(f=>f.id===a.figureId);
+  if(!fig) return;
+  toggleNotif(); // 패널 닫기
+  await showSignalDetail(
+    fig,
+    {title: a.title, titleOrig: a.titleOrig||a.title},
+    a.sectors||[],
+    a.tickers||a.topTickers||'',
+    a.score||a.maxScore||50
+  );
 }
 
 // 24시간 모니터링 시뮬레이션 (30초마다 체크)
