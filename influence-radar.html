@@ -1858,6 +1858,142 @@ function goToSector(s){
 // ═══════════════════════════════════════
 // RENDER: STOCKS
 // ═══════════════════════════════════════
+// ── 종목 검색
+function renderStocksSearch() {
+  const q = (state.tickerSearch||'').toLowerCase().trim();
+  const results = document.getElementById('ticker-search-results');
+  if(!results) return;
+  if(!q) { results.style.display='none'; return; }
+
+  // 전체 종목 풀에서 검색
+  const allStocks = Object.entries(SM).flatMap(([sec,sv])=>[
+    ...sv.d.map(s=>({...s,secKey:sec,secLabel:sv.label,secColor:sv.color})),
+    ...sv.i.map(s=>({...s,secKey:sec,secLabel:sv.label,secColor:sv.color})),
+  ]);
+  const seen={};
+  const unique = allStocks.filter(s=>{
+    if(seen[s.t]) return false; seen[s.t]=1; return true;
+  });
+
+  const matched = unique.filter(s=>
+    s.t.toLowerCase().includes(q) ||
+    s.n.toLowerCase().includes(q) ||
+    s.secLabel.toLowerCase().includes(q)
+  ).slice(0,8);
+
+  if(!matched.length){ results.style.display='none'; return; }
+
+  results.style.display='block';
+  results.innerHTML = matched.map(s=>{
+    const lp = fmtPrice(s.t);
+    return `<div onclick="selectTicker('${s.t}')"
+      style="padding:8px 14px;cursor:pointer;border-bottom:1px solid #12123a;
+        display:flex;align-items:center;gap:10px;"
+      onmouseover="this.style.background='#0a1a3a'" onmouseout="this.style.background=''">
+      <div style="min-width:55px">
+        <div style="font-size:13px;font-weight:bold;color:#4a9eff;font-family:var(--mono)">${s.t}</div>
+        <div style="font-size:8px;color:#446">${s.secLabel}</div>
+      </div>
+      <div style="flex:1;font-size:11px;color:#889;font-family:sans-serif">${s.n}</div>
+      <div style="text-align:right">
+        <div style="font-size:12px;color:#eeeeff;font-family:var(--mono)">${fmtUSD(lp.price)}</div>
+        ${lp.isLive&&lp.change!==0?`<div style="font-size:9px;color:${lp.color}">${lp.arrow}${Math.abs(lp.change)}%</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectTicker(ticker) {
+  state.tickerSearch = ticker;
+  state.searchedTicker = ticker;
+  const input = document.getElementById('ticker-search-input');
+  if(input) input.value = ticker;
+  const results = document.getElementById('ticker-search-results');
+  if(results) results.style.display='none';
+  renderStocks();
+}
+
+// ── 검색된 종목 상세 분석 카드
+function renderTickerDetail(ticker, fig) {
+  const allStocks = Object.entries(SM).flatMap(([sec,sv])=>[
+    ...sv.d.map(s=>({...s,secKey:sec,secLabel:sv.label,secColor:sv.color,type:'직접'})),
+    ...sv.i.map(s=>({...s,secKey:sec,secLabel:sv.label,secColor:sv.color,type:'간접'})),
+  ]);
+  const s = allStocks.find(s=>s.t===ticker);
+  const lp = fmtPrice(ticker);
+  const os = s ? opp(fig.inf, s.f, state.simDrop) : 0;
+
+  return `
+  <div style="padding:14px;background:#08081c;border:2px solid ${oppBorder(os)};
+    border-radius:6px;margin-bottom:14px">
+
+    <!-- 종목 헤더 -->
+    <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap">
+          <span style="font-size:22px;font-weight:bold;color:#4a9eff;font-family:var(--mono)">${ticker}</span>
+          ${s?`<span style="font-size:10px;padding:2px 8px;background:${s.secColor}15;
+            color:${s.secColor};border:1px solid ${s.secColor}33;border-radius:2px">${s.secLabel}</span>`:''}
+          ${s?`<span style="font-size:10px;padding:2px 8px;background:#1a1a4a;
+            color:#889;border-radius:2px">${s.type}</span>`:''}
+        </div>
+        <div style="font-size:12px;color:#aab;font-family:sans-serif">${s?.n||ticker}</div>
+        ${s?.note?`<div style="font-size:10px;color:#556;margin-top:3px;font-family:sans-serif">${s.note}</div>`:''}
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:24px;font-weight:bold;color:${lp.isLive?'#eeeeff':'#556'};font-family:var(--mono)">${fmtUSD(lp.price)}</div>
+        ${lp.isLive?`<div style="font-size:11px;color:${lp.color};font-family:var(--mono)">${lp.arrow}${Math.abs(lp.change)}%</div>`:''}
+        <div style="font-size:8px;color:${lp.isLive?'#4ade80':'#446'};margin-top:2px">${lp.isLive?'실시간':'추정가'}</div>
+      </div>
+    </div>
+
+    <!-- 지표 -->
+    ${s?`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+      <div style="padding:8px;background:#0a0a1e;border-radius:3px;text-align:center">
+        <div style="font-size:18px;font-weight:bold;color:${oppBorder(os)};font-family:var(--mono)">${os}</div>
+        <div style="font-size:8px;color:#446">기회점수</div>
+      </div>
+      <div style="padding:8px;background:#0a0a1e;border-radius:3px;text-align:center">
+        <div style="font-size:18px;font-weight:bold;color:${s.f>=70?'#4ade80':s.f>=50?'#fbbf24':'#f87171'};font-family:var(--mono)">${s.f}</div>
+        <div style="font-size:8px;color:#446">펀더멘털</div>
+      </div>
+      <div style="padding:8px;background:#0a0a1e;border-radius:3px;text-align:center">
+        <div style="font-size:18px;font-weight:bold;color:#fbbf24;font-family:var(--mono)">${state.simDrop}%</div>
+        <div style="font-size:8px;color:#446">예상 급락</div>
+      </div>
+    </div>`:''}
+
+    <!-- 매입 시뮬레이션 -->
+    ${s&&state.budget>0?`
+    ${(()=>{
+      const b = calcBuy(ticker, state.simDrop, state.budget);
+      return `<div style="background:#0a1a0a;border:1px solid #4ade8033;border-radius:4px;padding:12px">
+        <div style="font-size:10px;color:#4ade80;font-family:var(--mono);margin-bottom:8px;letter-spacing:1px">
+          💰 매입 시뮬레이션 (예산 ${fmtUSD(state.budget)})
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <div style="font-size:9px;color:#446;margin-bottom:2px">현재가</div>
+            <div style="font-size:14px;font-weight:bold;color:#eeeeff;font-family:var(--mono)">${fmtUSD(b.price)}</div>
+          </div>
+          <div>
+            <div style="font-size:9px;color:#446;margin-bottom:2px">목표 매입가</div>
+            <div style="font-size:14px;font-weight:bold;color:#fbbf24;font-family:var(--mono)">${fmtUSD(b.dropPrice)}</div>
+          </div>
+          <div>
+            <div style="font-size:9px;color:#446;margin-bottom:2px">매입 가능 주수</div>
+            <div style="font-size:14px;font-weight:bold;color:#4a9eff;font-family:var(--mono)">${b.shares}주</div>
+          </div>
+          <div>
+            <div style="font-size:9px;color:#446;margin-bottom:2px">회복 시 수익</div>
+            <div style="font-size:14px;font-weight:bold;color:#4ade80;font-family:var(--mono)">+${fmtUSD(b.profit)} (${b.profitPct}%)</div>
+          </div>
+        </div>
+      </div>`;
+    })()}`:''}
+  </div>`;
+}
+
 function renderStocks(){
   const sd = SM[state.selSector];
   const fig = getSortedFigs().find(f=>f.id===state.selFigId)||getSortedFigs()[0];
@@ -1887,8 +2023,36 @@ function renderStocks(){
       </select>
     </div>
 
-    <!-- 예산 입력 -->
-    ${budgetInput('renderStocks()')}
+    <!-- 종목 검색 -->
+    <div style="margin-bottom:14px">
+      <label style="font-size:9px;color:#446;letter-spacing:1px;display:block;margin-bottom:5px">종목 검색</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div style="flex:1;position:relative">
+          <input id="ticker-search-input" type="text"
+            placeholder="티커 또는 종목명 입력 (예: NVDA, Tesla, 반도체)"
+            value="${state.tickerSearch||''}"
+            oninput="state.tickerSearch=this.value;renderStocksSearch()"
+            style="width:100%;background:#0d0d28;border:1px solid #1a1a4a;
+              color:#eeeeff;padding:10px 14px;font-size:12px;
+              border-radius:3px;font-family:sans-serif;box-sizing:border-box">
+          <div id="ticker-search-results" style="position:absolute;left:0;right:0;top:100%;
+            background:#0d0d28;border:1px solid #1a1a4a;border-top:none;
+            border-radius:0 0 3px 3px;z-index:100;display:none;max-height:200px;overflow-y:auto">
+          </div>
+        </div>
+        <button onclick="state.tickerSearch='';state.searchedTicker=null;renderStocks()"
+          style="padding:10px 12px;border:1px solid #334;background:transparent;
+            color:#556;cursor:pointer;border-radius:3px;font-size:11px;white-space:nowrap">
+          초기화
+        </button>
+      </div>
+    </div>
+
+    <!-- 검색된 종목 상세 분석 -->
+    ${state.searchedTicker ? renderTickerDetail(state.searchedTicker, fig) : ''}
+
+    <!-- 예산 입력 (검색된 종목 있을 때만) -->
+    ${state.searchedTicker ? budgetInput('renderStocks()') : ''}
 
     <!-- SECTOR SELECTOR -->
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
